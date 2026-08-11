@@ -51,9 +51,17 @@ class GuestManagementController extends Controller
     public function showParty(Request $request, Event $event, InvitationParty $party): Response
     {
         $this->authorizeView($request, $event);
-        $party = $this->partyForEvent($event, $party)->load(['members', 'createdBy:id,name', 'event.package']);
+        $party = $this->partyForEvent($event, $party)->load(['members', 'createdBy:id,name', 'event.package', 'rsvp.personResponses.mealOption']);
+        $additionalGuests = ($party->rsvp?->personResponses ?? collect())->where('is_original_party_member', false)->map(fn ($person) => [
+            'first_name' => $person->first_name,
+            'last_name' => $person->last_name,
+            'member_type' => $person->member_type,
+            'is_attending' => $person->is_attending,
+            'meal' => $person->mealOption?->name,
+            'dietary_note' => $person->dietary_note,
+        ])->values();
 
-        return Inertia::render('Events/Guests/Show', ['event' => $event, 'party' => $party, 'canManage' => $request->user()->can('update', $event), 'memberTypes' => PartyMember::TYPES]);
+        return Inertia::render('Events/Guests/Show', ['event' => $event, 'party' => $party, 'rsvpAdditionalGuests' => $additionalGuests, 'partyDates' => ['created_at' => $this->formatDateTime($party->created_at), 'updated_at' => $this->formatDateTime($party->updated_at)], 'rsvpUrl' => route('public.rsvp.show', $party->rsvp_token), 'canManage' => $request->user()->can('update', $event), 'memberTypes' => PartyMember::TYPES]);
     }
 
     public function updateParty(Request $request, Event $event, InvitationParty $party): RedirectResponse
@@ -123,6 +131,7 @@ class GuestManagementController extends Controller
     private function authorizeManage(Request $request, Event $event): void { abort_unless($request->user()->can('update', $event), 403); }
     private function partyForEvent(Event $event, InvitationParty $party): InvitationParty { abort_unless($party->event_id === $event->id, 404); return $party; }
     private function memberForParty(InvitationParty $party, PartyMember $member): PartyMember { abort_unless($member->invitation_party_id === $party->id, 404); return $member; }
+    private function formatDateTime(?\DateTimeInterface $dateTime): ?string { return $dateTime ? \Carbon\CarbonImmutable::instance($dateTime)->setTimezone(config('app.timezone'))->format('F j, Y \\a\\t g:i A') : null; }
 
     private function assertCapacity(Event $event, int $maximumPartySize, ?int $exceptPartyId = null): void
     {

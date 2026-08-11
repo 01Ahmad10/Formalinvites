@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +21,31 @@ class Event extends Model
     public function members(): BelongsToMany { return $this->belongsToMany(User::class)->withPivot('role')->withTimestamps(); }
     public function payments(): HasMany { return $this->hasMany(Payment::class); }
     public function invitationParties(): HasMany { return $this->hasMany(InvitationParty::class); }
+    public function mealOptions(): HasMany { return $this->hasMany(EventMealOption::class); }
+
+    public function rsvpDeadlineAt(): ?CarbonImmutable
+    {
+        $deadline = $this->getRawOriginal('rsvp_deadline');
+        if (! $deadline) return null;
+
+        $timezone = config('app.timezone');
+
+        // The current column is a date. SQLite represents that as midnight text,
+        // but it still means the full local calendar day rather than UTC midnight.
+        if (($this->getCasts()['rsvp_deadline'] ?? null) === 'date') {
+            return CarbonImmutable::createFromFormat('!Y-m-d', substr($deadline, 0, 10), $timezone)->endOfDay();
+        }
+
+        // Keeps the rule safe if a future migration changes the field to a datetime.
+        return CarbonImmutable::parse($deadline, $timezone)->setTimezone($timezone);
+    }
+
+    public function isRsvpClosed(?CarbonImmutable $now = null): bool
+    {
+        $deadline = $this->rsvpDeadlineAt();
+
+        return $deadline !== null && ($now ?? CarbonImmutable::now(config('app.timezone')))->greaterThanOrEqualTo($deadline);
+    }
 
     public function allocatedGuestCapacity(?int $exceptPartyId = null): int
     {

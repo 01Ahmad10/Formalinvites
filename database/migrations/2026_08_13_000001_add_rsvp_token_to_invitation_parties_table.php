@@ -1,0 +1,3 @@
+<?php
+use Illuminate\Database\Migrations\Migration; use Illuminate\Database\Schema\Blueprint; use Illuminate\Support\Facades\DB; use Illuminate\Support\Facades\Schema; use Illuminate\Support\Str;
+return new class extends Migration { public function up(): void { Schema::table('invitation_parties', function (Blueprint $table) { $table->string('rsvp_token', 64)->nullable()->unique()->after('event_id'); }); DB::table('invitation_parties')->orderBy('id')->each(fn ($party) => DB::table('invitation_parties')->where('id', $party->id)->update(['rsvp_token' => Str::random(64)])); } public function down(): void { Schema::table('invitation_parties', fn (Blueprint $table) => $table->dropUnique(['rsvp_token'])->dropColumn('rsvp_token')); } };

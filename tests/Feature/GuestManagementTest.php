@@ -4,10 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\Event;
+use App\Models\EventMealOption;
 use App\Models\EventPackage;
 use App\Models\InvitationParty;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class GuestManagementTest extends TestCase
@@ -185,6 +188,37 @@ class GuestManagementTest extends TestCase
         $this->actingAs($admin)->patch(route('events.guests.active', [$event, $inactiveParty]), ['is_active' => true])->assertSessionHasErrors('maximum_party_size');
         $this->assertDatabaseHas('invitation_parties', ['id' => $inactiveParty->id, 'is_active' => false]);
         $this->actingAs($support)->put(route('events.guests.update', [$event, $inactiveParty]), $this->partyPayload('Support Attempt', 4))->assertForbidden();
+    }
+
+    public function test_party_details_show_only_current_rsvp_additional_guests_separately_and_format_system_dates(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $event = $this->eventWithPackage(10);
+        $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Williams Family', 'maximum_party_size' => 4]);
+        $party->members()->createMany([
+            ['first_name' => 'Michael', 'last_name' => 'Williams', 'member_type' => 'adult'],
+            ['first_name' => 'Anna', 'last_name' => 'Williams', 'member_type' => 'adult'],
+        ]);
+        DB::table('invitation_parties')->where('id', $party->id)->update(['created_at' => '2026-08-11 11:01:26', 'updated_at' => '2026-08-11 11:06:00']);
+        $meal = EventMealOption::create(['event_id' => $event->id, 'name' => 'Chicken', 'is_active' => true]);
+        $party->rsvp->update(['status' => 'attending', 'submitted_at' => now(), 'last_updated_at' => now()]);
+        $party->rsvp->personResponses()->create(['first_name' => 'Alex', 'last_name' => 'Williams', 'member_type' => 'child', 'is_original_party_member' => false, 'is_attending' => true, 'event_meal_option_id' => $meal->id, 'dietary_note' => 'Nut allergy']);
+
+        $otherEvent = $this->eventWithPackage(10);
+        $otherParty = InvitationParty::create(['event_id' => $otherEvent->id, 'name' => 'Private Family', 'maximum_party_size' => 2]);
+        $otherParty->rsvp->personResponses()->create(['first_name' => 'Private', 'member_type' => 'adult', 'is_original_party_member' => false, 'is_attending' => true]);
+
+        $this->actingAs($admin)->get(route('events.guests.show', [$event, $party]))->assertInertia(fn (Assert $page) => $page
+            ->component('Events/Guests/Show')
+            ->has('party.members', 2)
+            ->where('party.maximum_party_size', 4)
+            ->has('rsvpAdditionalGuests', 1)
+            ->where('rsvpAdditionalGuests.0.first_name', 'Alex')
+            ->where('rsvpAdditionalGuests.0.member_type', 'child')
+            ->where('rsvpAdditionalGuests.0.meal', 'Chicken')
+            ->where('rsvpAdditionalGuests.0.dietary_note', 'Nut allergy')
+            ->where('partyDates.created_at', 'August 11, 2026 at 11:01 AM')
+            ->where('partyDates.updated_at', 'August 11, 2026 at 11:06 AM'));
     }
 
     private function eventWithPackage(int $maximumGuests, ?Customer $customer = null): Event

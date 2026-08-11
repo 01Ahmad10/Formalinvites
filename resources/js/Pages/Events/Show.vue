@@ -2,7 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
-const props = defineProps<{ event: any; customer: any; paymentSummary: any; canEdit: boolean; canViewGuests: boolean; canManageGuests: boolean; isAdmin: boolean }>();
+const props = defineProps<{ event: any; customer: any; paymentSummary: any; canEdit: boolean; canViewGuests: boolean; canManageGuests: boolean; canViewRsvps: boolean; canManageRsvps: boolean; isAdmin: boolean }>();
 const value = (item: string | null | undefined) => item || 'Not provided';
 const date = (item: string | null | undefined) => item ? new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(`${item.slice(0, 10)}T00:00:00`)) : 'Not provided';
 const money = (item: string | number | null | undefined) => item === null || item === undefined ? 'Not provided' : `$${Number(item).toFixed(2)}`;
@@ -16,7 +16,7 @@ const label = (item: string) => item.replaceAll('_', ' ');
         <template #header>
             <div class="flex items-center justify-between gap-4">
                 <div><h2 class="text-xl font-semibold">{{ event.title }}</h2><p class="text-sm text-gray-600">{{ label(event.status) }}</p></div>
-                <div class="flex gap-2"><Link :href="route('events.index')" class="rounded border border-gray-300 px-3 py-2 text-sm">Back to Events</Link><Link v-if="canViewGuests" :href="route('events.guests.index', event.id)" class="rounded border border-gray-300 px-3 py-2 text-sm">Guests</Link><Link v-if="canEdit" :href="route('events.edit', event.id)" class="rounded bg-indigo-600 px-3 py-2 text-sm text-white">Edit Event</Link></div>
+                <div class="flex gap-2"><Link :href="route('events.index')" class="rounded border border-gray-300 px-3 py-2 text-sm">Back to Events</Link><Link v-if="canViewGuests" :href="route('events.guests.index', event.id)" class="rounded border border-gray-300 px-3 py-2 text-sm">Guests</Link><Link v-if="canViewRsvps" :href="route('events.rsvps.index', event.id)" class="rounded border border-gray-300 px-3 py-2 text-sm">RSVPs</Link><Link v-if="canEdit" :href="route('events.edit', event.id)" class="rounded bg-indigo-600 px-3 py-2 text-sm text-white">Edit Event</Link></div>
             </div>
         </template>
 

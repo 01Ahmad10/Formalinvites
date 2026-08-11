@@ -46,6 +46,8 @@ class EventController extends Controller
             'canEdit' => $user->can('update', $event),
             'canViewGuests' => $user->can('view', $event),
             'canManageGuests' => $user->can('update', $event),
+            'canViewRsvps' => $user->can('view', $event),
+            'canManageRsvps' => $user->can('update', $event),
             'isAdmin' => $user->isAdmin(),
         ]);
     }

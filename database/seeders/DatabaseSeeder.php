@@ -8,6 +8,7 @@ use App\Models\EventPackage;
 use App\Models\Payment;
 use App\Models\Coupon;
 use App\Models\InvitationParty;
+use App\Models\EventMealOption;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -44,6 +45,8 @@ class DatabaseSeeder extends Seeder
         $couple->members()->firstOrCreate(['first_name' => 'Leila', 'last_name' => 'Haddad'], ['member_type' => 'adult']);
         $family->members()->firstOrCreate(['first_name' => 'John', 'last_name' => 'Smith'], ['member_type' => 'adult']);
         $family->members()->firstOrCreate(['first_name' => 'Emma', 'last_name' => 'Smith'], ['member_type' => 'child']);
+        EventMealOption::firstOrCreate(['event_id' => $wedding->id, 'name' => 'Chicken'], ['description' => 'Roasted chicken', 'display_order' => 1, 'is_active' => true]);
+        EventMealOption::firstOrCreate(['event_id' => $wedding->id, 'name' => 'Vegetarian'], ['description' => 'Vegetarian option', 'display_order' => 2, 'is_active' => true]);
         Coupon::firstOrCreate(['code' => 'WELCOME10'], ['description' => 'Development welcome coupon', 'discount_type' => 'percentage', 'discount_value' => 10, 'is_active' => true]);
         $payment = Payment::firstOrCreate(['event_id' => $wedding->id], ['customer_id' => $first->id, 'event_package_id' => $packages[1]->id, 'original_amount' => 55, 'discount' => 5, 'discount_type' => 'fixed', 'discount_value' => 5, 'final_amount' => 50, 'paid_amount' => 0, 'status' => 'unpaid']);
         if (! $payment->transactions()->exists() && (float) $payment->paid_amount === 0.0) {

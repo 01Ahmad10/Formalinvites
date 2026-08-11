@@ -5,6 +5,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\GuestManagementController;
+use App\Http\Controllers\RsvpController;
+use App\Http\Controllers\PublicRsvpController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -19,6 +21,8 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
+Route::get('rsvp/{token}', [PublicRsvpController::class, 'show'])->name('public.rsvp.show');
+Route::post('rsvp/{token}', [PublicRsvpController::class, 'submit'])->name('public.rsvp.submit');
 
 Route::middleware('auth')->group(function () {
     Route::resource('events', EventController::class)->except('destroy');
@@ -30,6 +34,12 @@ Route::middleware('auth')->group(function () {
     Route::post('events/{event}/guests/{party}/members', [GuestManagementController::class, 'storeMember'])->name('events.guests.members.store');
     Route::put('events/{event}/guests/{party}/members/{member}', [GuestManagementController::class, 'updateMember'])->name('events.guests.members.update');
     Route::delete('events/{event}/guests/{party}/members/{member}', [GuestManagementController::class, 'destroyMember'])->name('events.guests.members.destroy');
+    Route::get('events/{event}/rsvps', [RsvpController::class, 'index'])->name('events.rsvps.index');
+    Route::get('events/{event}/rsvps/{party}', [RsvpController::class, 'show'])->name('events.rsvps.show');
+    Route::post('events/{event}/meals', [RsvpController::class, 'storeMeal'])->name('events.meals.store');
+    Route::put('events/{event}/meals/{meal}', [RsvpController::class, 'updateMeal'])->name('events.meals.update');
+    Route::patch('events/{event}/meals/{meal}/active', [RsvpController::class, 'setMealActive'])->name('events.meals.active');
+    Route::patch('events/{event}/guests/{party}/rsvp-token', [RsvpController::class, 'regenerateToken'])->name('events.guests.rsvp-token');
 });
 
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {

@@ -34,7 +34,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::put('packages/{package}', [AdminController::class, 'updatePackage'])->name('packages.update');
     Route::get('payments', [AdminController::class, 'payments'])->name('payments.index');
     Route::post('payments', [AdminController::class, 'storePayment'])->name('payments.store');
+    Route::get('payments/{payment}', [AdminController::class, 'showPayment'])->name('payments.show');
+    Route::post('payments/{payment}/transactions', [AdminController::class, 'storePaymentTransaction'])->name('payments.transactions.store');
+    Route::put('payments/{payment}/discount', [AdminController::class, 'updatePaymentDiscount'])->name('payments.discount.update');
+    Route::put('payments/{payment}/coupon', [AdminController::class, 'applyPaymentCoupon'])->name('payments.coupon.update');
     Route::patch('payments/{payment}/confirm', [AdminController::class, 'confirmPayment'])->name('payments.confirm');
+    Route::get('coupons', [AdminController::class, 'coupons'])->name('coupons.index');
+    Route::post('coupons', [AdminController::class, 'storeCoupon'])->name('coupons.store');
+    Route::put('coupons/{coupon}', [AdminController::class, 'updateCoupon'])->name('coupons.update');
 });
 
 Route::middleware('auth')->group(function () {

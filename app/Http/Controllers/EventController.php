@@ -22,7 +22,7 @@ class EventController extends Controller
         $user = request()->user();
         abort_unless($user->can('view', $event), 403);
 
-        $event->load(['package', 'members:id,name', 'payments' => fn ($query) => $query->latest()]);
+        $event->load(['package', 'members:id,name', 'payments' => fn ($query) => $query->with(['transactions' => fn ($transactions) => $transactions->orderBy('payment_date')->orderBy('id')])->latest()]);
         $payment = $event->payments->first();
         $event->unsetRelation('payments');
 
@@ -33,10 +33,14 @@ class EventController extends Controller
                 'package_price' => $event->package?->price,
                 'original_amount' => $payment->original_amount,
                 'discount' => $payment->discount,
+                'discount_type' => $payment->discount_type,
+                'discount_value' => $payment->discount_value,
+                'coupon_code' => $payment->coupon_code,
                 'status' => $payment->status,
                 'final_amount' => $payment->final_amount,
                 'paid_amount' => $payment->paid_amount,
-                'remaining_amount' => max((float) $payment->final_amount - (float) $payment->paid_amount, 0),
+                'remaining_amount' => $payment->remainingAmount(),
+                'transactions' => $payment->transactions->map(fn ($transaction) => ['id' => $transaction->id, 'amount' => $transaction->amount, 'payment_method' => $transaction->payment_method, 'reference' => $transaction->reference, 'payment_date' => $transaction->payment_date]),
             ] : null,
             'canEdit' => $user->can('update', $event),
             'isAdmin' => $user->isAdmin(),

@@ -1,0 +1,34 @@
+<script setup lang="ts">
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import ConfirmationModal from '@/Components/ConfirmationModal.vue';
+import InputError from '@/Components/InputError.vue';
+import ValidationSummary from '@/Components/ValidationSummary.vue';
+import { Head, Link, useForm } from '@inertiajs/vue3';
+import { ref } from 'vue';
+
+const props = defineProps<{ payment: any; coupons: any[] }>();
+const transactionForm = useForm({ amount: '', payment_method: 'cash', reference: '', payment_date: '', notes: '' });
+const discountForm = useForm({ discount_type: props.payment.discount_type || 'fixed', discount_value: props.payment.discount_value || 0 });
+const couponForm = useForm({ coupon_id: props.payment.coupon_id || '' });
+const confirmTransaction = ref(false);
+const money = (value: any) => `$${Number(value || 0).toFixed(2)}`;
+const submitTransaction = () => transactionForm.post(route('admin.payments.transactions.store', props.payment.id), { onFinish: () => { confirmTransaction.value = false; } });
+</script>
+
+<template>
+    <Head title="Financial details" />
+    <AuthenticatedLayout>
+        <template #header><div class="flex items-center justify-between gap-3"><h2 class="text-xl font-semibold">Financial details</h2><Link :href="route('admin.payments.index')" class="rounded border border-gray-300 px-3 py-2 text-sm">Back to financial records</Link></div></template>
+        <div class="mx-auto max-w-6xl space-y-5 p-6">
+            <section class="rounded bg-white p-5 shadow"><h3 class="mb-4 text-lg font-semibold">Summary</h3><dl class="grid gap-4 sm:grid-cols-3"><div><dt class="text-sm text-gray-500">Customer</dt><dd>{{ payment.customer?.name }}</dd></div><div><dt class="text-sm text-gray-500">Event</dt><dd>{{ payment.event?.title || 'Not provided' }}</dd></div><div><dt class="text-sm text-gray-500">Package</dt><dd>{{ payment.package?.name || 'Not provided' }}</dd></div><div><dt class="text-sm text-gray-500">Original amount</dt><dd>{{ money(payment.original_amount) }}</dd></div><div><dt class="text-sm text-gray-500">Discount</dt><dd>{{ money(payment.discount) }} <span v-if="payment.discount_type" class="text-gray-500">({{ payment.discount_type }}: {{ payment.discount_value }})</span></dd></div><div><dt class="text-sm text-gray-500">Coupon</dt><dd>{{ payment.coupon_code || 'No coupon' }}</dd></div><div><dt class="text-sm text-gray-500">Final amount</dt><dd>{{ money(payment.final_amount) }}</dd></div><div><dt class="text-sm text-gray-500">Total paid</dt><dd>{{ money(payment.paid_amount) }}</dd></div><div><dt class="text-sm text-gray-500">Remaining balance</dt><dd>{{ money(Math.max(Number(payment.final_amount) - Number(payment.paid_amount), 0)) }}</dd></div><div><dt class="text-sm text-gray-500">Status</dt><dd class="capitalize">{{ payment.status.replaceAll('_', ' ') }}</dd></div></dl></section>
+
+            <section class="grid gap-5 lg:grid-cols-2"><form @submit.prevent="confirmTransaction = true" class="rounded bg-white p-5 shadow"><h3 class="mb-3 text-lg font-semibold">Add payment</h3><div class="grid gap-3 sm:grid-cols-2"><div><label class="mb-1 block text-sm">Amount</label><input v-model="transactionForm.amount" type="number" min="0.01" step="0.01" required class="w-full rounded border-gray-300" /><InputError :message="transactionForm.errors.amount" class="mt-1" /></div><div><label class="mb-1 block text-sm">Method</label><input v-model="transactionForm.payment_method" class="w-full rounded border-gray-300" /></div><div><label class="mb-1 block text-sm">Reference</label><input v-model="transactionForm.reference" class="w-full rounded border-gray-300" /></div><div><label class="mb-1 block text-sm">Payment date</label><input v-model="transactionForm.payment_date" type="date" class="w-full rounded border-gray-300" /></div><div class="sm:col-span-2"><label class="mb-1 block text-sm">Notes</label><textarea v-model="transactionForm.notes" class="w-full rounded border-gray-300" /></div></div><ValidationSummary :errors="transactionForm.errors" /><button :disabled="transactionForm.processing" class="mt-3 rounded bg-indigo-600 px-3 py-2 text-white">Record payment</button></form>
+                <div class="space-y-5"><form @submit.prevent="discountForm.put(route('admin.payments.discount.update', payment.id))" class="rounded bg-white p-5 shadow"><h3 class="mb-3 text-lg font-semibold">Apply or change discount</h3><div class="flex flex-wrap gap-3"><select v-model="discountForm.discount_type" class="rounded border-gray-300"><option value="fixed">Fixed amount</option><option value="percentage">Percentage</option></select><input v-model="discountForm.discount_value" type="number" min="0" step="0.01" class="rounded border-gray-300" /><button class="rounded bg-gray-800 px-3 text-white">Save discount</button></div><ValidationSummary :errors="discountForm.errors" /></form>
+                    <form @submit.prevent="couponForm.put(route('admin.payments.coupon.update', payment.id))" class="rounded bg-white p-5 shadow"><h3 class="mb-3 text-lg font-semibold">Apply coupon</h3><div class="flex flex-wrap gap-3"><select v-model="couponForm.coupon_id" class="rounded border-gray-300"><option value="">Select active coupon</option><option v-for="coupon in coupons" :key="coupon.id" :value="coupon.id">{{ coupon.code }}</option></select><button class="rounded bg-gray-800 px-3 text-white">Apply coupon</button></div><ValidationSummary :errors="couponForm.errors" /></form></div>
+            </section>
+
+            <section class="overflow-x-auto rounded bg-white shadow"><div class="p-5"><h3 class="text-lg font-semibold">Payment history</h3><p class="text-sm text-gray-500">Transactions are shown oldest first.</p></div><table class="min-w-full text-left text-sm"><thead class="bg-gray-50 text-gray-600"><tr><th class="p-3">Amount</th><th class="p-3">Date</th><th class="p-3">Method</th><th class="p-3">Reference</th><th class="p-3">Notes</th><th class="p-3">Recorded by</th></tr></thead><tbody><tr v-for="transaction in payment.transactions" :key="transaction.id" class="border-t"><td class="p-3">{{ money(transaction.amount) }}</td><td class="p-3">{{ transaction.payment_date || 'Not provided' }}</td><td class="p-3">{{ transaction.payment_method || 'Not provided' }}</td><td class="p-3">{{ transaction.reference || 'Not provided' }}</td><td class="p-3">{{ transaction.notes || 'Not provided' }}</td><td class="p-3">{{ transaction.recorded_by?.name || 'Historical record' }}</td></tr></tbody></table><p v-if="!payment.transactions.length" class="p-5 text-gray-600">No payment transactions have been recorded yet.</p></section>
+        </div>
+        <ConfirmationModal :show="confirmTransaction" title="Record payment?" message="This will add a confirmed payment transaction and update the financial balance." confirm-label="Record payment" @close="confirmTransaction = false" @confirm="submitTransaction" />
+    </AuthenticatedLayout>
+</template>

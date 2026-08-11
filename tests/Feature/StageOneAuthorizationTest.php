@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\Coupon;
 use App\Models\Event;
 use App\Models\EventPackage;
 use App\Models\Payment;
@@ -48,10 +49,12 @@ class StageOneAuthorizationTest extends TestCase
     public function test_admin_can_record_and_confirm_manual_payment(): void
     {
         $admin = User::factory()->create(['role'=>'admin']); $customer = Customer::create(['name'=>'Customer']); $package=EventPackage::create(['name'=>'Small','minimum_guests'=>1,'maximum_guests'=>50,'price'=>25,'is_active'=>true]);
-        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id'=>$customer->id,'event_package_id'=>$package->id,'original_amount'=>25,'discount'=>0,'paid_amount'=>25])->assertRedirect();
+        $event = Event::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'title' => 'Payment Event', 'event_type' => 'wedding', 'host_name' => 'Host', 'status' => 'draft']);
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id'=>$customer->id,'event_id' => $event->id,'event_package_id'=>$package->id,'original_amount'=>25,'discount'=>0,'paid_amount'=>25])->assertRedirect();
         $paymentId = \App\Models\Payment::firstOrFail()->id;
         $this->actingAs($admin)->patch(route('admin.payments.confirm', $paymentId))->assertRedirect();
-        $this->assertDatabaseHas('payments', ['id'=>$paymentId,'status'=>'confirmed']);
+        $this->assertDatabaseHas('payments', ['id'=>$paymentId,'status'=>'paid']);
+        $this->assertDatabaseHas('payment_transactions', ['payment_id' => $paymentId, 'amount' => 25]);
     }
 
     public function test_admin_searches_customers_users_events_and_payments_from_database(): void
@@ -168,12 +171,12 @@ class StageOneAuthorizationTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $customer = Customer::create(['name'=>'Customer']);
-        Payment::create(['customer_id'=>$customer->id,'original_amount'=>100,'discount'=>10,'final_amount'=>90,'paid_amount'=>40,'status'=>'pending']);
-        Payment::create(['customer_id'=>$customer->id,'original_amount'=>50,'discount'=>0,'final_amount'=>50,'paid_amount'=>60,'status'=>'confirmed']);
+        Payment::create(['customer_id'=>$customer->id,'original_amount'=>100,'discount'=>10,'final_amount'=>90,'paid_amount'=>40,'status'=>'partially_paid']);
+        Payment::create(['customer_id'=>$customer->id,'original_amount'=>50,'discount'=>0,'final_amount'=>50,'paid_amount'=>60,'status'=>'paid']);
 
         $version = app(HandleInertiaRequests::class)->version(request());
         $response = $this->actingAs($admin)->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $version])->get(route('admin.payments.index'));
-        $response->assertOk()->assertJsonPath('props.summary.total_final_amount', 140)->assertJsonPath('props.summary.total_paid_amount', 100)->assertJsonPath('props.summary.total_remaining_amount', 50)->assertJsonPath('props.summary.pending_count', 1)->assertJsonPath('props.summary.confirmed_count', 1);
+        $response->assertOk()->assertJsonPath('props.summary.total_final_amount', 140)->assertJsonPath('props.summary.total_paid_amount', 100)->assertJsonPath('props.summary.total_remaining_amount', 50)->assertJsonPath('props.summary.partially_paid_count', 1)->assertJsonPath('props.summary.paid_count', 1);
     }
 
     public function test_customer_cannot_access_another_customers_financial_summary(): void
@@ -185,5 +188,191 @@ class StageOneAuthorizationTest extends TestCase
         Payment::create(['customer_id'=>$second->id,'event_id'=>$privateEvent->id,'original_amount'=>100,'discount'=>0,'final_amount'=>100,'paid_amount'=>25,'status'=>'pending']);
 
         $this->actingAs($user)->get(route('events.show', $privateEvent))->assertForbidden();
+    }
+
+    public function test_admin_can_record_full_and_partial_payments_with_transaction_history(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $event = Event::create(['customer_id' => $customer->id, 'title' => 'Financial Event', 'event_type' => 'wedding', 'host_name' => 'Host', 'status' => 'draft']);
+
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $customer->id, 'event_id' => $event->id, 'original_amount' => 100, 'paid_amount' => 100, 'payment_method' => 'cash'])->assertRedirect();
+        $full = Payment::where('event_id', $event->id)->firstOrFail();
+        $this->assertSame('paid', $full->status);
+        $this->assertSame('100.00', $full->paid_amount);
+        $this->assertCount(1, $full->transactions);
+
+        $secondEvent = Event::create(['customer_id' => $customer->id, 'title' => 'Partial Event', 'event_type' => 'birthday', 'host_name' => 'Host', 'status' => 'draft']);
+        $partial = Payment::create(['customer_id' => $customer->id, 'event_id' => $secondEvent->id, 'original_amount' => 100, 'discount' => 0, 'final_amount' => 100, 'paid_amount' => 0, 'status' => 'unpaid']);
+        $this->actingAs($admin)->post(route('admin.payments.transactions.store', $partial), ['amount' => 40, 'payment_method' => 'cash'])->assertRedirect();
+        $partial->refresh();
+        $this->assertSame('partially_paid', $partial->status);
+        $this->assertSame('40.00', $partial->paid_amount);
+        $this->actingAs($admin)->post(route('admin.payments.transactions.store', $partial), ['amount' => 60, 'payment_method' => 'bank transfer'])->assertRedirect();
+        $partial->refresh();
+        $this->assertSame('paid', $partial->status);
+        $this->assertSame('100.00', $partial->paid_amount);
+        $this->assertSame(0.0, $partial->remainingAmount());
+        $this->assertCount(2, $partial->transactions);
+    }
+
+    public function test_unpaid_status_and_overpayment_protection_are_enforced(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $payment = Payment::create(['customer_id' => $customer->id, 'original_amount' => 100, 'discount' => 0, 'final_amount' => 100, 'paid_amount' => 0, 'status' => 'unpaid']);
+
+        $this->assertSame('unpaid', $payment->status);
+        $this->actingAs($admin)->post(route('admin.payments.transactions.store', $payment), ['amount' => 100.01])->assertSessionHasErrors('amount');
+        $this->assertCount(0, $payment->transactions);
+    }
+
+    public function test_admin_can_apply_fixed_and_percentage_discounts_without_negative_final_amounts(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $payment = Payment::create(['customer_id' => $customer->id, 'original_amount' => 200, 'discount' => 0, 'final_amount' => 200, 'paid_amount' => 0, 'status' => 'unpaid']);
+
+        $this->actingAs($admin)->put(route('admin.payments.discount.update', $payment), ['discount_type' => 'fixed', 'discount_value' => 25])->assertRedirect();
+        $this->assertDatabaseHas('payments', ['id' => $payment->id, 'discount' => 25, 'final_amount' => 175, 'discount_type' => 'fixed', 'discount_value' => 25]);
+        $this->actingAs($admin)->put(route('admin.payments.discount.update', $payment), ['discount_type' => 'percentage', 'discount_value' => 10])->assertRedirect();
+        $this->assertDatabaseHas('payments', ['id' => $payment->id, 'discount' => 20, 'final_amount' => 180, 'discount_type' => 'percentage', 'discount_value' => 10]);
+        $this->actingAs($admin)->put(route('admin.payments.discount.update', $payment), ['discount_type' => 'percentage', 'discount_value' => 101])->assertSessionHasErrors('discount_value');
+    }
+
+    public function test_admin_can_apply_valid_coupon_and_reject_inactive_or_expired_coupons(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $payment = Payment::create(['customer_id' => $customer->id, 'original_amount' => 200, 'discount' => 0, 'final_amount' => 200, 'paid_amount' => 0, 'status' => 'unpaid']);
+        $valid = Coupon::create(['code' => 'TENOFF', 'discount_type' => 'percentage', 'discount_value' => 10, 'is_active' => true]);
+        $expired = Coupon::create(['code' => 'EXPIRED', 'discount_type' => 'fixed', 'discount_value' => 20, 'is_active' => true, 'expires_at' => now()->subDay()]);
+        $inactive = Coupon::create(['code' => 'INACTIVE', 'discount_type' => 'fixed', 'discount_value' => 20, 'is_active' => false]);
+
+        $this->actingAs($admin)->put(route('admin.payments.coupon.update', $payment), ['coupon_id' => $valid->id])->assertRedirect();
+        $this->assertDatabaseHas('payments', ['id' => $payment->id, 'coupon_id' => $valid->id, 'coupon_code' => 'TENOFF', 'discount' => 20, 'final_amount' => 180]);
+        $this->actingAs($admin)->put(route('admin.payments.coupon.update', $payment), ['coupon_id' => $expired->id])->assertSessionHasErrors('coupon_id');
+        $this->actingAs($admin)->put(route('admin.payments.coupon.update', $payment), ['coupon_id' => $inactive->id])->assertSessionHasErrors('coupon_id');
+    }
+
+    public function test_customer_cannot_add_payments_or_change_discounts_and_coupons(): void
+    {
+        $customer = Customer::create(['name' => 'Customer']);
+        $user = User::factory()->create(['role' => 'customer', 'customer_id' => $customer->id]);
+        $payment = Payment::create(['customer_id' => $customer->id, 'original_amount' => 100, 'discount' => 0, 'final_amount' => 100, 'paid_amount' => 0, 'status' => 'unpaid']);
+        $coupon = Coupon::create(['code' => 'NOACCESS', 'discount_type' => 'fixed', 'discount_value' => 10, 'is_active' => true]);
+
+        $this->actingAs($user)->post(route('admin.payments.transactions.store', $payment), ['amount' => 10])->assertForbidden();
+        $this->actingAs($user)->put(route('admin.payments.discount.update', $payment), ['discount_type' => 'fixed', 'discount_value' => 10])->assertForbidden();
+        $this->actingAs($user)->put(route('admin.payments.coupon.update', $payment), ['coupon_id' => $coupon->id])->assertForbidden();
+    }
+
+    public function test_authorized_customer_can_view_only_their_event_financial_summary_and_safe_history(): void
+    {
+        $customer = Customer::create(['name' => 'Customer']);
+        $user = User::factory()->create(['role' => 'customer', 'customer_id' => $customer->id]);
+        $event = Event::create(['customer_id' => $customer->id, 'title' => 'My Financial Event', 'event_type' => 'wedding', 'host_name' => 'Host', 'status' => 'draft']);
+        $event->members()->attach($user, ['role' => 'owner']);
+        $payment = Payment::create(['customer_id' => $customer->id, 'event_id' => $event->id, 'original_amount' => 100, 'discount' => 0, 'final_amount' => 100, 'paid_amount' => 0, 'status' => 'unpaid']);
+        $payment->transactions()->create(['amount' => 40, 'payment_method' => 'cash', 'reference' => 'SAFE-REF', 'notes' => 'Internal note', 'status' => 'confirmed']);
+        $payment->refreshTotals();
+
+        $this->actingAs($user)->get(route('events.show', $event))->assertOk()->assertSee(['partially_paid', 'SAFE-REF'])->assertDontSee('Internal note');
+    }
+
+    public function test_financial_record_selection_data_identifies_each_events_customer_and_assigned_package(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $first = Customer::create(['name' => 'First']);
+        $second = Customer::create(['name' => 'Second']);
+        $firstPackage = EventPackage::create(['name' => 'First Package', 'minimum_guests' => 1, 'maximum_guests' => 50, 'price' => 25, 'is_active' => true]);
+        $secondPackage = EventPackage::create(['name' => 'Second Package', 'minimum_guests' => 51, 'maximum_guests' => 100, 'price' => 55, 'is_active' => true]);
+        $firstEvent = Event::create(['customer_id' => $first->id, 'event_package_id' => $firstPackage->id, 'title' => 'First Event', 'event_type' => 'wedding', 'host_name' => 'Host', 'status' => 'draft']);
+        $secondEvent = Event::create(['customer_id' => $second->id, 'event_package_id' => $secondPackage->id, 'title' => 'Second Event', 'event_type' => 'birthday', 'host_name' => 'Host', 'status' => 'draft']);
+
+        $version = app(HandleInertiaRequests::class)->version(request());
+        $response = $this->actingAs($admin)->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $version])->get(route('admin.payments.index'));
+        $events = collect($response->json('props.events'));
+
+        $this->assertSame([$firstEvent->id], $events->where('customer_id', $first->id)->pluck('id')->all());
+        $this->assertSame([$secondEvent->id], $events->where('customer_id', $second->id)->pluck('id')->all());
+        $this->assertSame($firstPackage->id, $events->firstWhere('id', $firstEvent->id)['package']['id']);
+    }
+
+    public function test_financial_record_rejects_stale_customer_event_and_package_combinations_and_derives_event_package(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $first = Customer::create(['name' => 'First']);
+        $second = Customer::create(['name' => 'Second']);
+        $assigned = EventPackage::create(['name' => 'Assigned', 'minimum_guests' => 1, 'maximum_guests' => 50, 'price' => 25, 'is_active' => true]);
+        $unrelated = EventPackage::create(['name' => 'Unrelated', 'minimum_guests' => 51, 'maximum_guests' => 100, 'price' => 55, 'is_active' => true]);
+        $firstEvent = Event::create(['customer_id' => $first->id, 'event_package_id' => $assigned->id, 'title' => 'First Event', 'event_type' => 'wedding', 'host_name' => 'Host', 'status' => 'draft']);
+        $secondEvent = Event::create(['customer_id' => $second->id, 'event_package_id' => $assigned->id, 'title' => 'Second Event', 'event_type' => 'birthday', 'host_name' => 'Host', 'status' => 'draft']);
+        $noPackageEvent = Event::create(['customer_id' => $first->id, 'title' => 'No Package Event', 'event_type' => 'birthday', 'host_name' => 'Host', 'status' => 'draft']);
+
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $first->id, 'event_id' => $secondEvent->id, 'event_package_id' => $assigned->id, 'original_amount' => 25])->assertSessionHasErrors('event_id');
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $first->id, 'event_id' => $firstEvent->id, 'event_package_id' => $unrelated->id, 'original_amount' => 25])->assertSessionHasErrors('event_package_id');
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $first->id, 'event_id' => $noPackageEvent->id, 'event_package_id' => $unrelated->id, 'original_amount' => 25])->assertSessionHasErrors('event_package_id');
+
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $first->id, 'event_id' => $firstEvent->id, 'original_amount' => 25])->assertRedirect();
+        $this->assertDatabaseHas('payments', ['customer_id' => $first->id, 'event_id' => $firstEvent->id, 'event_package_id' => $assigned->id]);
+    }
+
+    public function test_admin_can_create_a_financial_record_with_a_coupon_snapshot(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $package = EventPackage::create(['name' => 'Package', 'minimum_guests' => 1, 'maximum_guests' => 50, 'price' => 200, 'is_active' => true]);
+        $event = Event::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'title' => 'Coupon Event', 'event_type' => 'wedding', 'host_name' => 'Host', 'status' => 'draft']);
+        $coupon = Coupon::create(['code' => 'SAVE10', 'discount_type' => 'percentage', 'discount_value' => 10, 'is_active' => true]);
+
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $customer->id, 'event_id' => $event->id, 'original_amount' => 200, 'coupon_id' => $coupon->id, 'paid_amount' => 50])->assertRedirect();
+        $this->assertDatabaseHas('payments', ['event_id' => $event->id, 'coupon_id' => $coupon->id, 'coupon_code' => 'SAVE10', 'discount_type' => 'percentage', 'discount_value' => 10, 'discount' => 20, 'final_amount' => 180, 'paid_amount' => 50]);
+    }
+
+    public function test_admin_can_create_a_financial_record_with_a_manual_fixed_discount(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $event = Event::create(['customer_id' => $customer->id, 'title' => 'Fixed Discount Event', 'event_type' => 'wedding', 'host_name' => 'Host', 'status' => 'draft']);
+
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $customer->id, 'event_id' => $event->id, 'original_amount' => 200, 'discount_type' => 'fixed', 'discount_value' => 25])->assertRedirect();
+        $this->assertDatabaseHas('payments', ['event_id' => $event->id, 'discount_type' => 'fixed', 'discount_value' => 25, 'discount' => 25, 'final_amount' => 175, 'coupon_id' => null]);
+    }
+
+    public function test_admin_can_create_a_financial_record_with_a_manual_percentage_discount(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $event = Event::create(['customer_id' => $customer->id, 'title' => 'Percentage Discount Event', 'event_type' => 'birthday', 'host_name' => 'Host', 'status' => 'draft']);
+
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $customer->id, 'event_id' => $event->id, 'original_amount' => 200, 'discount_type' => 'percentage', 'discount_value' => 10])->assertRedirect();
+        $this->assertDatabaseHas('payments', ['event_id' => $event->id, 'discount_type' => 'percentage', 'discount_value' => 10, 'discount' => 20, 'final_amount' => 180, 'coupon_id' => null]);
+    }
+
+    public function test_financial_record_creation_rejects_an_invalid_coupon(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $event = Event::create(['customer_id' => $customer->id, 'title' => 'Invalid Coupon Event', 'event_type' => 'birthday', 'host_name' => 'Host', 'status' => 'draft']);
+        $coupon = Coupon::create(['code' => 'INACTIVE-CREATE', 'discount_type' => 'fixed', 'discount_value' => 20, 'is_active' => false]);
+
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $customer->id, 'event_id' => $event->id, 'original_amount' => 200, 'coupon_id' => $coupon->id])->assertSessionHasErrors('coupon_id');
+        $this->assertDatabaseMissing('payments', ['event_id' => $event->id]);
+
+        $validCoupon = Coupon::create(['code' => 'VALID-CREATE', 'discount_type' => 'fixed', 'discount_value' => 20, 'is_active' => true]);
+        $secondEvent = Event::create(['customer_id' => $customer->id, 'title' => 'Mixed Discount Event', 'event_type' => 'wedding', 'host_name' => 'Host', 'status' => 'draft']);
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $customer->id, 'event_id' => $secondEvent->id, 'original_amount' => 200, 'coupon_id' => $validCoupon->id, 'discount_type' => 'fixed', 'discount_value' => 10])->assertSessionHasErrors('coupon_id');
+        $this->assertDatabaseMissing('payments', ['event_id' => $secondEvent->id]);
+    }
+
+    public function test_initial_payment_is_limited_by_the_calculated_final_amount_during_creation(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $event = Event::create(['customer_id' => $customer->id, 'title' => 'Initial Payment Event', 'event_type' => 'wedding', 'host_name' => 'Host', 'status' => 'draft']);
+
+        $this->actingAs($admin)->post(route('admin.payments.store'), ['customer_id' => $customer->id, 'event_id' => $event->id, 'original_amount' => 100, 'discount_type' => 'fixed', 'discount_value' => 20, 'paid_amount' => 81])->assertSessionHasErrors('paid_amount');
+        $this->assertDatabaseMissing('payments', ['event_id' => $event->id]);
     }
 }

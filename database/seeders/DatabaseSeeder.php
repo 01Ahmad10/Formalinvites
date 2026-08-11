@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventPackage;
 use App\Models\Payment;
 use App\Models\Coupon;
+use App\Models\InvitationParty;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -35,6 +36,14 @@ class DatabaseSeeder extends Seeder
         $wedding->members()->syncWithoutDetaching([$maya->id => ['role' => 'owner']]);
         $birthday->members()->syncWithoutDetaching([$maya->id => ['role' => 'owner']]);
         $engagement->members()->syncWithoutDetaching([$karim->id => ['role' => 'owner']]);
+        $individual = InvitationParty::firstOrCreate(['event_id' => $wedding->id, 'name' => 'Nadia Saad'], ['primary_contact_name' => 'Nadia Saad', 'email' => 'nadia@example.test', 'maximum_party_size' => 1, 'table_name' => 'A1', 'created_by' => $admin->id]);
+        $couple = InvitationParty::firstOrCreate(['event_id' => $wedding->id, 'name' => 'Rami and Leila Haddad'], ['primary_contact_name' => 'Rami Haddad', 'phone' => '555-0110', 'maximum_party_size' => 2, 'table_name' => 'A2', 'created_by' => $admin->id]);
+        $family = InvitationParty::firstOrCreate(['event_id' => $wedding->id, 'name' => 'The Smith Family'], ['primary_contact_name' => 'John Smith', 'email' => 'smith@example.test', 'maximum_party_size' => 4, 'table_name' => 'B1', 'created_by' => $admin->id]);
+        $individual->members()->firstOrCreate(['first_name' => 'Nadia', 'last_name' => 'Saad'], ['member_type' => 'adult']);
+        $couple->members()->firstOrCreate(['first_name' => 'Rami', 'last_name' => 'Haddad'], ['member_type' => 'adult']);
+        $couple->members()->firstOrCreate(['first_name' => 'Leila', 'last_name' => 'Haddad'], ['member_type' => 'adult']);
+        $family->members()->firstOrCreate(['first_name' => 'John', 'last_name' => 'Smith'], ['member_type' => 'adult']);
+        $family->members()->firstOrCreate(['first_name' => 'Emma', 'last_name' => 'Smith'], ['member_type' => 'child']);
         Coupon::firstOrCreate(['code' => 'WELCOME10'], ['description' => 'Development welcome coupon', 'discount_type' => 'percentage', 'discount_value' => 10, 'is_active' => true]);
         $payment = Payment::firstOrCreate(['event_id' => $wedding->id], ['customer_id' => $first->id, 'event_package_id' => $packages[1]->id, 'original_amount' => 55, 'discount' => 5, 'discount_type' => 'fixed', 'discount_value' => 5, 'final_amount' => 50, 'paid_amount' => 0, 'status' => 'unpaid']);
         if (! $payment->transactions()->exists() && (float) $payment->paid_amount === 0.0) {

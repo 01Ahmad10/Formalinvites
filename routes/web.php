@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\GuestManagementController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -21,6 +22,14 @@ Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('
 
 Route::middleware('auth')->group(function () {
     Route::resource('events', EventController::class)->except('destroy');
+    Route::get('events/{event}/guests', [GuestManagementController::class, 'index'])->name('events.guests.index');
+    Route::post('events/{event}/guests', [GuestManagementController::class, 'storeParty'])->name('events.guests.store');
+    Route::get('events/{event}/guests/{party}', [GuestManagementController::class, 'showParty'])->name('events.guests.show');
+    Route::put('events/{event}/guests/{party}', [GuestManagementController::class, 'updateParty'])->name('events.guests.update');
+    Route::patch('events/{event}/guests/{party}/active', [GuestManagementController::class, 'setPartyActive'])->name('events.guests.active');
+    Route::post('events/{event}/guests/{party}/members', [GuestManagementController::class, 'storeMember'])->name('events.guests.members.store');
+    Route::put('events/{event}/guests/{party}/members/{member}', [GuestManagementController::class, 'updateMember'])->name('events.guests.members.update');
+    Route::delete('events/{event}/guests/{party}/members/{member}', [GuestManagementController::class, 'destroyMember'])->name('events.guests.members.destroy');
 });
 
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {

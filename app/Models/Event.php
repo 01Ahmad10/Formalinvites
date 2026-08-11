@@ -19,4 +19,10 @@ class Event extends Model
     public function package(): BelongsTo { return $this->belongsTo(EventPackage::class, 'event_package_id'); }
     public function members(): BelongsToMany { return $this->belongsToMany(User::class)->withPivot('role')->withTimestamps(); }
     public function payments(): HasMany { return $this->hasMany(Payment::class); }
+    public function invitationParties(): HasMany { return $this->hasMany(InvitationParty::class); }
+
+    public function allocatedGuestCapacity(?int $exceptPartyId = null): int
+    {
+        return (int) $this->invitationParties()->where('is_active', true)->when($exceptPartyId, fn ($query) => $query->where('id', '!=', $exceptPartyId))->sum('maximum_party_size');
+    }
 }

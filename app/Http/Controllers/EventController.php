@@ -8,6 +8,7 @@ use App\Models\EventPackage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -43,11 +44,13 @@ class EventController extends Controller
                 'transactions' => $payment->transactions->map(fn ($transaction) => ['id' => $transaction->id, 'amount' => $transaction->amount, 'payment_method' => $transaction->payment_method, 'reference' => $transaction->reference, 'payment_date' => $transaction->payment_date]),
             ] : null,
             'canEdit' => $user->can('update', $event),
+            'canViewGuests' => $user->can('view', $event),
+            'canManageGuests' => $user->can('update', $event),
             'isAdmin' => $user->isAdmin(),
         ]);
     }
     public function edit(Event $event): Response { $user = request()->user(); abort_unless($user->can('update', $event), 403); return Inertia::render('Events/Form', ['event' => $event->load('package'), 'customers' => $user->isAdmin() ? Customer::where('is_active', true)->get() : [], 'packages' => $user->isAdmin() ? EventPackage::where('is_active', true)->capacityOrder()->get() : [], 'types' => Event::TYPES, 'statuses' => $this->statusesFor($user->isAdmin()), 'isAdmin' => $user->isAdmin()]); }
-    public function update(Request $request, Event $event): RedirectResponse { abort_unless($request->user()->can('update', $event), 403); $data = $this->validated($request); if (!$request->user()->isAdmin()) { unset($data['customer_id'], $data['event_package_id']); } $event->update($data); return to_route('events.show', $event)->with('success', 'Event updated.'); }
+    public function update(Request $request, Event $event): RedirectResponse { abort_unless($request->user()->can('update', $event), 403); $data = $this->validated($request); if (!$request->user()->isAdmin()) { unset($data['customer_id'], $data['event_package_id']); } elseif (isset($data['event_package_id']) && (int) $data['event_package_id'] !== (int) $event->event_package_id) { $package = EventPackage::findOrFail($data['event_package_id']); if ($event->allocatedGuestCapacity() > $package->maximum_guests) throw ValidationException::withMessages(['event_package_id' => 'This package cannot be assigned because the event already has more allocated guest capacity.']); } $event->update($data); return to_route('events.show', $event)->with('success', 'Event updated.'); }
     private function validated(Request $request): array
     {
         $statusRules = ['required', Rule::in(Event::STATUSES)];

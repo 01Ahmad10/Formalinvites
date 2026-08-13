@@ -14,10 +14,12 @@ class Event extends Model
     use HasFactory;
     public const TYPES = ['wedding', 'engagement', 'bridal_shower', 'birthday', 'graduation', 'baptism', 'communion'];
     public const STATUSES = ['draft', 'submitted', 'under_review', 'changes_requested', 'approved', 'published', 'archived'];
-    protected $fillable = ['customer_id', 'event_package_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'event_timezone', 'dress_code', 'parking_information', 'transportation_information', 'accommodation_information', 'guest_information', 'status'];
+    protected $fillable = ['customer_id', 'event_package_id', 'template_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'event_timezone', 'dress_code', 'parking_information', 'transportation_information', 'accommodation_information', 'guest_information', 'status'];
     protected function casts(): array { return ['main_date' => 'date', 'rsvp_deadline' => 'date']; }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function package(): BelongsTo { return $this->belongsTo(EventPackage::class, 'event_package_id'); }
+    public function template(): BelongsTo { return $this->belongsTo(Template::class); }
+    public function templateSetting(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(EventTemplateSetting::class); }
     public function members(): BelongsToMany { return $this->belongsToMany(User::class)->withPivot('role')->withTimestamps(); }
     public function payments(): HasMany { return $this->hasMany(Payment::class); }
     public function invitationParties(): HasMany { return $this->hasMany(InvitationParty::class); }

@@ -11,6 +11,8 @@ use App\Models\Coupon;
 use App\Models\InvitationParty;
 use App\Models\EventMealOption;
 use App\Models\User;
+use App\Models\Template;
+use App\Support\InvitationTemplateSettings;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -32,6 +34,9 @@ class DatabaseSeeder extends Seeder
         $maya = User::firstOrCreate(['email' => 'maya@formalevites.test'], ['name' => 'Maya Haddad', 'role' => 'customer', 'customer_id' => $first->id, 'password' => $password]);
         $karim = User::firstOrCreate(['email' => 'karim@formalevites.test'], ['name' => 'Karim Nasser', 'role' => 'customer', 'customer_id' => $second->id, 'password' => $password]);
         $packages = collect([[1,50,25],[51,100,55],[101,150,80],[151,200,100],[201,250,130],[251,300,180],[301,350,200],[351,400,280],[401,450,null],[451,500,350]])->map(fn ($row) => EventPackage::firstOrCreate(['name' => "{$row[0]}-{$row[1]} guests"], ['minimum_guests' => $row[0], 'maximum_guests' => $row[1], 'price' => $row[2], 'is_active' => true]));
+        $elegant = Template::firstOrCreate(['slug' => 'elegant-classic'], ['name' => 'Elegant Classic', 'description' => 'A timeless formal invitation layout.', 'category' => 'formal', 'component_key' => 'elegant-classic', 'supported_event_types' => ['wedding', 'engagement'], 'default_settings' => InvitationTemplateSettings::defaults(), 'is_active' => true, 'display_order' => 1]);
+        Template::firstOrCreate(['slug' => 'modern-minimal'], ['name' => 'Modern Minimal', 'description' => 'A clean, contemporary invitation layout.', 'category' => 'modern', 'component_key' => 'modern-minimal', 'default_settings' => [...InvitationTemplateSettings::defaults(), 'heading_font' => 'modern_sans', 'text_alignment' => 'left'], 'is_active' => true, 'display_order' => 2]);
+        Template::firstOrCreate(['slug' => 'romantic-floral'], ['name' => 'Romantic Floral', 'description' => 'A warm romantic invitation layout.', 'category' => 'romantic', 'component_key' => 'romantic-floral', 'supported_event_types' => ['wedding', 'bridal_shower', 'engagement'], 'default_settings' => [...InvitationTemplateSettings::defaults(), 'primary_color' => '#B76E79'], 'is_active' => true, 'display_order' => 3]);
         $wedding = Event::firstOrCreate(['title' => 'Maya and Elias Wedding'], ['customer_id' => $first->id, 'event_package_id' => $packages[1]->id, 'event_type' => 'wedding', 'host_name' => 'Maya Haddad', 'main_date' => now()->addMonths(3)->toDateString(), 'venue' => 'Cedar Hall', 'status' => 'approved']);
         $birthday = Event::firstOrCreate(['title' => 'Nour Birthday'], ['customer_id' => $first->id, 'event_package_id' => $packages[0]->id, 'event_type' => 'birthday', 'host_name' => 'Maya Haddad', 'main_date' => now()->addMonth()->toDateString(), 'status' => 'draft']);
         $engagement = Event::firstOrCreate(['title' => 'Karim and Rania Engagement'], ['customer_id' => $second->id, 'event_package_id' => $packages[2]->id, 'event_type' => 'engagement', 'host_name' => 'Karim Nasser', 'main_date' => now()->addMonths(2)->toDateString(), 'status' => 'submitted']);
@@ -43,7 +48,9 @@ class DatabaseSeeder extends Seeder
             'transportation_information' => 'Please arrange your own transportation.',
             'accommodation_information' => 'A guest rate is available at the nearby Cedar Hotel.',
             'guest_information' => 'Please arrive 15 minutes before the ceremony.',
+            'template_id' => $elegant->id,
         ]);
+        $wedding->templateSetting()->firstOrCreate([], ['settings' => ['primary_color' => '#C9A96E']]);
         $weddingDate = $wedding->main_date->toDateString();
         $ceremonyStart = \Carbon\CarbonImmutable::createFromFormat('!Y-m-d H:i', "{$weddingDate} 16:00", $wedding->event_timezone);
         $receptionStart = \Carbon\CarbonImmutable::createFromFormat('!Y-m-d H:i', "{$weddingDate} 18:00", $wedding->event_timezone);

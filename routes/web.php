@@ -8,6 +8,8 @@ use App\Http\Controllers\GuestManagementController;
 use App\Http\Controllers\RsvpController;
 use App\Http\Controllers\PublicRsvpController;
 use App\Http\Controllers\EventActivityController;
+use App\Http\Controllers\EventInvitationController;
+use App\Http\Controllers\AdminTemplateController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -34,6 +36,9 @@ Route::middleware('auth')->group(function () {
     Route::get('events/{event}/activities/{activity}/edit', [EventActivityController::class, 'edit'])->name('events.activities.edit');
     Route::put('events/{event}/activities/{activity}', [EventActivityController::class, 'update'])->name('events.activities.update');
     Route::patch('events/{event}/activities/{activity}/active', [EventActivityController::class, 'setActive'])->name('events.activities.active');
+    Route::get('events/{event}/invitation', [EventInvitationController::class, 'edit'])->name('events.invitation.edit');
+    Route::put('events/{event}/invitation', [EventInvitationController::class, 'update'])->name('events.invitation.update');
+    Route::get('events/{event}/invitation/preview', [EventInvitationController::class, 'preview'])->name('events.invitation.preview');
     Route::get('events/{event}/guests', [GuestManagementController::class, 'index'])->name('events.guests.index');
     Route::post('events/{event}/guests', [GuestManagementController::class, 'storeParty'])->name('events.guests.store');
     Route::get('events/{event}/guests/{party}', [GuestManagementController::class, 'showParty'])->name('events.guests.show');
@@ -69,6 +74,10 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('coupons', [AdminController::class, 'coupons'])->name('coupons.index');
     Route::post('coupons', [AdminController::class, 'storeCoupon'])->name('coupons.store');
     Route::put('coupons/{coupon}', [AdminController::class, 'updateCoupon'])->name('coupons.update');
+    Route::get('templates', [AdminTemplateController::class, 'index'])->name('templates.index');
+    Route::post('templates', [AdminTemplateController::class, 'store'])->name('templates.store');
+    Route::put('templates/{template}', [AdminTemplateController::class, 'update'])->name('templates.update');
+    Route::patch('templates/{template}/active', [AdminTemplateController::class, 'setActive'])->name('templates.active');
 });
 
 Route::middleware('auth')->group(function () {

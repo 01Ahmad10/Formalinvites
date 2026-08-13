@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\GuestManagementController;
 use App\Http\Controllers\RsvpController;
 use App\Http\Controllers\PublicRsvpController;
+use App\Http\Controllers\EventActivityController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -26,6 +27,13 @@ Route::post('rsvp/{token}', [PublicRsvpController::class, 'submit'])->name('publ
 
 Route::middleware('auth')->group(function () {
     Route::resource('events', EventController::class)->except('destroy');
+    Route::get('events/{event}/activities', [EventActivityController::class, 'index'])->name('events.activities.index');
+    Route::get('events/{event}/activities/create', [EventActivityController::class, 'create'])->name('events.activities.create');
+    Route::post('events/{event}/activities', [EventActivityController::class, 'store'])->name('events.activities.store');
+    Route::get('events/{event}/activities/{activity}', [EventActivityController::class, 'show'])->name('events.activities.show');
+    Route::get('events/{event}/activities/{activity}/edit', [EventActivityController::class, 'edit'])->name('events.activities.edit');
+    Route::put('events/{event}/activities/{activity}', [EventActivityController::class, 'update'])->name('events.activities.update');
+    Route::patch('events/{event}/activities/{activity}/active', [EventActivityController::class, 'setActive'])->name('events.activities.active');
     Route::get('events/{event}/guests', [GuestManagementController::class, 'index'])->name('events.guests.index');
     Route::post('events/{event}/guests', [GuestManagementController::class, 'storeParty'])->name('events.guests.store');
     Route::get('events/{event}/guests/{party}', [GuestManagementController::class, 'showParty'])->name('events.guests.show');

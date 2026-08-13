@@ -14,7 +14,7 @@ class Event extends Model
     use HasFactory;
     public const TYPES = ['wedding', 'engagement', 'bridal_shower', 'birthday', 'graduation', 'baptism', 'communion'];
     public const STATUSES = ['draft', 'submitted', 'under_review', 'changes_requested', 'approved', 'published', 'archived'];
-    protected $fillable = ['customer_id', 'event_package_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'status'];
+    protected $fillable = ['customer_id', 'event_package_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'event_timezone', 'dress_code', 'parking_information', 'transportation_information', 'accommodation_information', 'guest_information', 'status'];
     protected function casts(): array { return ['main_date' => 'date', 'rsvp_deadline' => 'date']; }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function package(): BelongsTo { return $this->belongsTo(EventPackage::class, 'event_package_id'); }
@@ -22,13 +22,14 @@ class Event extends Model
     public function payments(): HasMany { return $this->hasMany(Payment::class); }
     public function invitationParties(): HasMany { return $this->hasMany(InvitationParty::class); }
     public function mealOptions(): HasMany { return $this->hasMany(EventMealOption::class); }
+    public function activities(): HasMany { return $this->hasMany(EventActivity::class); }
 
     public function rsvpDeadlineAt(): ?CarbonImmutable
     {
         $deadline = $this->getRawOriginal('rsvp_deadline');
         if (! $deadline) return null;
 
-        $timezone = config('app.timezone');
+        $timezone = $this->event_timezone ?: config('app.timezone');
 
         // The current column is a date. SQLite represents that as midnight text,
         // but it still means the full local calendar day rather than UTC midnight.
@@ -44,7 +45,7 @@ class Event extends Model
     {
         $deadline = $this->rsvpDeadlineAt();
 
-        return $deadline !== null && ($now ?? CarbonImmutable::now(config('app.timezone')))->greaterThanOrEqualTo($deadline);
+        return $deadline !== null && ($now ?? CarbonImmutable::now($this->event_timezone ?: config('app.timezone')))->greaterThanOrEqualTo($deadline);
     }
 
     public function allocatedGuestCapacity(?int $exceptPartyId = null): int

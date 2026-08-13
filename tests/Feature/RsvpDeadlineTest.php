@@ -54,6 +54,30 @@ class RsvpDeadlineTest extends TestCase
         $this->assertTrue($event->isRsvpClosed(CarbonImmutable::parse('2026-08-12 21:00:00', 'UTC')));
     }
 
+    public function test_date_only_deadline_uses_each_events_timezone_instead_of_the_application_timezone(): void
+    {
+        config(['app.timezone' => 'UTC']);
+        $event = $this->event('2026-08-12');
+        $event->update(['event_timezone' => 'America/New_York']);
+
+        $deadline = $event->rsvpDeadlineAt();
+
+        $this->assertSame('America/New_York', $deadline->getTimezone()->getName());
+        $this->assertSame('2026-08-12 23:59:59', $deadline->format('Y-m-d H:i:s'));
+        $this->assertFalse($event->isRsvpClosed(CarbonImmutable::parse('2026-08-13 03:59:59.999998', 'UTC')));
+        $this->assertTrue($event->isRsvpClosed(CarbonImmutable::parse('2026-08-13 04:00:00', 'UTC')));
+    }
+
+    public function test_los_angeles_event_deadline_remains_open_until_its_local_end_of_day(): void
+    {
+        config(['app.timezone' => 'UTC']);
+        $event = $this->event('2026-08-12');
+        $event->update(['event_timezone' => 'America/Los_Angeles']);
+
+        $this->assertFalse($event->isRsvpClosed(CarbonImmutable::parse('2026-08-13 06:59:59.999998', 'UTC')));
+        $this->assertTrue($event->isRsvpClosed(CarbonImmutable::parse('2026-08-13 07:00:00', 'UTC')));
+    }
+
     private function event(string $deadline): Event
     {
         $customer = Customer::create(['name' => 'Customer '.uniqid()]);

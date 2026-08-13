@@ -44,6 +44,32 @@ const submit = () => form.post(route('public.rsvp.submit', route().params.token)
                 </dl>
             </section>
 
+            <section v-if="party.event.schedule?.length" class="rounded bg-white p-6 shadow">
+                <h2 class="text-lg font-semibold">Event schedule</h2>
+                <div class="mt-4 space-y-4">
+                    <article v-for="(activity, index) in party.event.schedule" :key="`${activity.title}-${index}`" class="border-t pt-4 first:border-t-0 first:pt-0">
+                        <h3 class="font-medium">{{ activity.title }}</h3>
+                        <p v-if="activity.activity_type" class="mt-1 text-sm capitalize text-gray-500">{{ activity.activity_type }}</p>
+                        <p class="mt-2 text-sm text-gray-700">{{ activity.date }} · {{ activity.start_time }}<span v-if="activity.end_time"> – {{ activity.end_date === activity.date ? '' : `${activity.end_date}, ` }}{{ activity.end_time }}</span></p>
+                        <p v-if="activity.venue || activity.address" class="mt-1 text-sm text-gray-600">{{ activity.venue || 'Location to be confirmed' }}<span v-if="activity.address"> · {{ activity.address }}</span></p>
+                        <p v-if="activity.description" class="mt-2 whitespace-pre-line text-sm text-gray-700">{{ activity.description }}</p>
+                        <p v-if="activity.location_notes" class="mt-2 whitespace-pre-line text-sm text-gray-700">{{ activity.location_notes }}</p>
+                        <a v-if="activity.location_url" :href="activity.location_url" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block text-sm text-indigo-600 underline">Open location</a>
+                    </article>
+                </div>
+            </section>
+
+            <section v-if="Object.values(party.event.guest_information || {}).some(Boolean)" class="rounded bg-white p-6 shadow">
+                <h2 class="text-lg font-semibold">Guest information</h2>
+                <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                    <div v-if="party.event.guest_information.dress_code"><dt class="text-gray-500">Dress code</dt><dd class="whitespace-pre-line">{{ party.event.guest_information.dress_code }}</dd></div>
+                    <div v-if="party.event.guest_information.parking_information"><dt class="text-gray-500">Parking</dt><dd class="whitespace-pre-line">{{ party.event.guest_information.parking_information }}</dd></div>
+                    <div v-if="party.event.guest_information.transportation_information"><dt class="text-gray-500">Transportation</dt><dd class="whitespace-pre-line">{{ party.event.guest_information.transportation_information }}</dd></div>
+                    <div v-if="party.event.guest_information.accommodation_information"><dt class="text-gray-500">Accommodation</dt><dd class="whitespace-pre-line">{{ party.event.guest_information.accommodation_information }}</dd></div>
+                    <div v-if="party.event.guest_information.additional_information" class="sm:col-span-2"><dt class="text-gray-500">Additional information</dt><dd class="whitespace-pre-line">{{ party.event.guest_information.additional_information }}</dd></div>
+                </dl>
+            </section>
+
             <section v-if="hasSubmittedResponse && !isEditing" class="rounded bg-white p-6 shadow">
                 <p v-if="confirmation" class="mb-3 rounded border border-green-200 bg-green-50 p-3 text-green-800">{{ confirmation }}</p>
                 <div class="flex items-start justify-between gap-4">

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Customer;
 use App\Models\Event;
+use App\Models\EventActivity;
 use App\Models\EventPackage;
 use App\Models\Payment;
 use App\Models\Coupon;
@@ -34,6 +35,20 @@ class DatabaseSeeder extends Seeder
         $wedding = Event::firstOrCreate(['title' => 'Maya and Elias Wedding'], ['customer_id' => $first->id, 'event_package_id' => $packages[1]->id, 'event_type' => 'wedding', 'host_name' => 'Maya Haddad', 'main_date' => now()->addMonths(3)->toDateString(), 'venue' => 'Cedar Hall', 'status' => 'approved']);
         $birthday = Event::firstOrCreate(['title' => 'Nour Birthday'], ['customer_id' => $first->id, 'event_package_id' => $packages[0]->id, 'event_type' => 'birthday', 'host_name' => 'Maya Haddad', 'main_date' => now()->addMonth()->toDateString(), 'status' => 'draft']);
         $engagement = Event::firstOrCreate(['title' => 'Karim and Rania Engagement'], ['customer_id' => $second->id, 'event_package_id' => $packages[2]->id, 'event_type' => 'engagement', 'host_name' => 'Karim Nasser', 'main_date' => now()->addMonths(2)->toDateString(), 'status' => 'submitted']);
+        $wedding->update([
+            'event_timezone' => 'America/New_York',
+            'rsvp_deadline' => $wedding->main_date?->copy()->subDays(10)->toDateString(),
+            'dress_code' => 'Formal attire',
+            'parking_information' => 'Complimentary parking is available at Cedar Hall.',
+            'transportation_information' => 'Please arrange your own transportation.',
+            'accommodation_information' => 'A guest rate is available at the nearby Cedar Hotel.',
+            'guest_information' => 'Please arrive 15 minutes before the ceremony.',
+        ]);
+        $weddingDate = $wedding->main_date->toDateString();
+        $ceremonyStart = \Carbon\CarbonImmutable::createFromFormat('!Y-m-d H:i', "{$weddingDate} 16:00", $wedding->event_timezone);
+        $receptionStart = \Carbon\CarbonImmutable::createFromFormat('!Y-m-d H:i', "{$weddingDate} 18:00", $wedding->event_timezone);
+        EventActivity::firstOrCreate(['event_id' => $wedding->id, 'title' => 'Wedding ceremony'], ['activity_type' => 'ceremony', 'description' => 'Please be seated before the ceremony begins.', 'starts_at' => $ceremonyStart->utc(), 'ends_at' => $ceremonyStart->addHour()->utc(), 'venue' => 'Cedar Hall Garden', 'display_order' => 1, 'is_active' => true]);
+        EventActivity::firstOrCreate(['event_id' => $wedding->id, 'title' => 'Reception'], ['activity_type' => 'reception', 'starts_at' => $receptionStart->utc(), 'ends_at' => $receptionStart->addHours(4)->utc(), 'venue' => 'Cedar Hall Ballroom', 'display_order' => 2, 'is_active' => true]);
         $wedding->members()->syncWithoutDetaching([$maya->id => ['role' => 'owner']]);
         $birthday->members()->syncWithoutDetaching([$maya->id => ['role' => 'owner']]);
         $engagement->members()->syncWithoutDetaching([$karim->id => ['role' => 'owner']]);

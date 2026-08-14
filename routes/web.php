@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\GuestManagementController;
 use App\Http\Controllers\RsvpController;
 use App\Http\Controllers\PublicRsvpController;
+use App\Http\Controllers\PublicInvitationController;
 use App\Http\Controllers\EventActivityController;
 use App\Http\Controllers\EventInvitationController;
 use App\Http\Controllers\AdminTemplateController;
@@ -26,6 +27,7 @@ Route::get('/', function () {
 Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
 Route::get('rsvp/{token}', [PublicRsvpController::class, 'show'])->name('public.rsvp.show');
 Route::post('rsvp/{token}', [PublicRsvpController::class, 'submit'])->name('public.rsvp.submit');
+Route::get('invite/{token}', [PublicInvitationController::class, 'show'])->name('public.invitation.show');
 
 Route::middleware('auth')->group(function () {
     Route::resource('events', EventController::class)->except('destroy');

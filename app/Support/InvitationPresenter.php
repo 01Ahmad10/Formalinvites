@@ -16,6 +16,7 @@ class InvitationPresenter
 
         return [
             'template' => $template ? ['name' => $template->name, 'component_key' => $template->component_key, 'is_active' => $template->is_active] : null,
+            'experience' => $this->experience($template?->component_key),
             'settings' => InvitationTemplateSettings::resolve($template?->default_settings, $event->templateSetting?->settings),
             'party_name' => $party?->name,
             'event' => [
@@ -56,5 +57,15 @@ class InvitationPresenter
         $normalizedTime = strlen($time) === 5 ? "{$time}:00" : $time;
 
         return CarbonImmutable::createFromFormat('!H:i:s', $normalizedTime, $timezone)->format('g:i A');
+    }
+
+    private function experience(?string $componentKey): array
+    {
+        // These are trusted component-owned hooks. Stage 6A intentionally ships
+        // without media assets, so both safely fall back to the visual intro.
+        return match ($componentKey) {
+            'romantic-floral' => ['intro_video' => null, 'audio' => null],
+            default => ['intro_video' => null, 'audio' => null],
+        };
     }
 }

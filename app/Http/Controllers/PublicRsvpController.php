@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\EventMealOption;
 use App\Models\InvitationParty;
+use App\Support\PublicRsvpPayload;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,25 +40,40 @@ class PublicRsvpController extends Controller
             'status' => ['required', Rule::in(['attending', 'not_attending'])],
             'guest_message' => ['nullable', 'string'],
             'members' => ['nullable', 'array'],
-            'members.*.id' => ['required', 'integer', 'distinct'],
+            'members.*.id' => ['required', 'distinct'],
             'members.*.is_attending' => ['required', 'boolean'],
-            'members.*.event_meal_option_id' => ['nullable', 'integer'],
+            'members.*.event_meal_option_id' => ['nullable'],
             'members.*.dietary_note' => ['nullable', 'string'],
             'additional_guests' => ['nullable', 'array'],
             'additional_guests.*.first_name' => ['required', 'string', 'max:100'],
             'additional_guests.*.last_name' => ['nullable', 'string', 'max:100'],
             'additional_guests.*.member_type' => ['required', Rule::in(['adult', 'child'])],
-            'additional_guests.*.event_meal_option_id' => ['nullable', 'integer'],
+            'additional_guests.*.event_meal_option_id' => ['nullable'],
             'additional_guests.*.dietary_note' => ['nullable', 'string'],
         ]);
 
         $rsvp = $party->rsvp()->firstOrCreate([], ['status' => 'pending']);
 
+        $publicPayload = app(PublicRsvpPayload::class);
+        foreach ($data['members'] ?? [] as $index => $row) {
+            $memberId = $publicPayload->memberId($party, $row['id']);
+            if (! $memberId) throw ValidationException::withMessages(['members' => 'An RSVP member does not belong to this invitation.']);
+            $data['members'][$index]['id'] = $memberId;
+            $mealId = $publicPayload->mealId($party, $row['event_meal_option_id'] ?? null);
+            if (($row['event_meal_option_id'] ?? null) && ! $mealId) throw ValidationException::withMessages(['members' => 'A selected meal option is unavailable for this event.']);
+            $data['members'][$index]['event_meal_option_id'] = $mealId;
+        }
+        foreach ($data['additional_guests'] ?? [] as $index => $row) {
+            $mealId = $publicPayload->mealId($party, $row['event_meal_option_id'] ?? null);
+            if (($row['event_meal_option_id'] ?? null) && ! $mealId) throw ValidationException::withMessages(['members' => 'A selected meal option is unavailable for this event.']);
+            $data['additional_guests'][$index]['event_meal_option_id'] = $mealId;
+        }
+
         if ($data['status'] === 'not_attending') {
             $rsvp->personResponses()->delete();
             $rsvp->update(['status' => 'not_attending', 'guest_message' => $data['guest_message'] ?? null, 'submitted_at' => $rsvp->submitted_at ?? now(), 'last_updated_at' => now()]);
 
-            return to_route('public.rsvp.show', $token)->with('success', 'Thank you for letting us know.');
+            return $this->redirectAfterSubmission($request, $token)->with('success', 'Thank you for letting us know.');
         }
 
         $memberIds = collect($data['members'] ?? [])->pluck('id')->map(fn ($id) => (int) $id);
@@ -101,7 +117,7 @@ class PublicRsvpController extends Controller
         }
         $rsvp->update(['status' => 'attending', 'guest_message' => $data['guest_message'] ?? null, 'submitted_at' => $rsvp->submitted_at ?? now(), 'last_updated_at' => now()]);
 
-        return to_route('public.rsvp.show', $token)->with('success', 'Thank you. Your RSVP has been received.');
+        return $this->redirectAfterSubmission($request, $token)->with('success', 'Thank you. Your RSVP has been received.');
     }
 
     private function party(string $token): InvitationParty
@@ -112,6 +128,17 @@ class PublicRsvpController extends Controller
     private function closed(InvitationParty $party): bool
     {
         return $party->event->isRsvpClosed();
+    }
+
+    private function redirectAfterSubmission(Request $request, string $token): RedirectResponse
+    {
+        $invitationUrl = route('public.invitation.show', $token);
+        $refererPath = parse_url((string) $request->headers->get('referer'), PHP_URL_PATH);
+        $invitationPath = parse_url($invitationUrl, PHP_URL_PATH);
+
+        return $refererPath === $invitationPath
+            ? to_route('public.invitation.show', $token)
+            : to_route('public.rsvp.show', $token);
     }
 
     private function publicParty(InvitationParty $party): array

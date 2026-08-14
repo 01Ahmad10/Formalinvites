@@ -31,11 +31,6 @@ class EventInvitationController extends Controller
             'templates' => $templates,
             'overrides' => $event->templateSetting?->settings ?? [],
             'resolvedSettings' => InvitationTemplateSettings::resolve($event->template?->default_settings, $event->templateSetting?->settings),
-            'sectionKeys' => InvitationTemplateSettings::SECTION_KEYS,
-            'headingFonts' => InvitationTemplateSettings::HEADING_FONTS,
-            'bodyFonts' => InvitationTemplateSettings::BODY_FONTS,
-            'alignments' => InvitationTemplateSettings::ALIGNMENTS,
-            'layoutVariants' => InvitationTemplateSettings::LAYOUT_VARIANTS,
             'parties' => $event->invitationParties()->orderBy('name')->get(['id', 'name']),
             'canManage' => $request->user()->can('update', $event),
             'previewInvitation' => $presenter->present($event),
@@ -55,8 +50,12 @@ class EventInvitationController extends Controller
             throw ValidationException::withMessages(['template_id' => 'This template does not support the selected Event type.']);
         }
 
+        if (! $template && ! empty($data['settings'])) {
+            throw ValidationException::withMessages(['settings' => 'Choose a Template before selecting a color style or typography.']);
+        }
+
+        $settings = InvitationTemplateSettings::validateEventSettings($data['settings'] ?? [], $template?->default_settings);
         $event->update(['template_id' => $template?->id]);
-        $settings = InvitationTemplateSettings::validate($data['settings'] ?? []);
         if ($request->has('settings')) {
             $event->templateSetting()->updateOrCreate([], ['settings' => $settings]);
         }
@@ -76,5 +75,5 @@ class EventInvitationController extends Controller
 
     private function view(Request $request, Event $event): void { abort_unless($request->user()->can('view', $event), 403); }
     private function manage(Request $request, Event $event): void { abort_unless($request->user()->can('update', $event), 403); }
-    private function templateForSelection(Template $template): array { return ['id' => $template->id, 'name' => $template->name, 'description' => $template->description, 'component_key' => $template->component_key, 'is_active' => $template->is_active, 'default_settings' => $template->default_settings]; }
+    private function templateForSelection(Template $template): array { return ['id' => $template->id, 'name' => $template->name, 'description' => $template->description, 'component_key' => $template->component_key, 'is_active' => $template->is_active, ...InvitationTemplateSettings::selectionOptions($template->default_settings)]; }
 }

@@ -64,7 +64,7 @@ class AdminTemplateController extends Controller
             'is_active' => ['boolean'],
             'display_order' => ['nullable', 'integer', 'min:0'],
         ]);
-        $data['default_settings'] = InvitationTemplateSettings::validate($data['default_settings'] ?? []);
+        $data['default_settings'] = InvitationTemplateSettings::validateTemplateDefinition($data['default_settings'] ?? []);
 
         return $data;
     }

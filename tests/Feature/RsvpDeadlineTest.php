@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\Event;
 use App\Models\EventPackage;
+use App\Models\EventPublication;
 use App\Models\InvitationParty;
+use App\Support\InvitationPublicationSnapshotBuilder;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -31,6 +33,7 @@ class RsvpDeadlineTest extends TestCase
         config(['app.timezone' => 'UTC']);
         $event = $this->event('2026-08-12');
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Party', 'maximum_party_size' => 1]);
+        $this->publish($event);
 
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-12 23:59:59', 'UTC'));
         $this->post(route('public.rsvp.submit', $party->rsvp_token), ['status' => 'not_attending'])->assertRedirect();
@@ -91,6 +94,20 @@ class RsvpDeadlineTest extends TestCase
             'host_name' => 'Host',
             'status' => 'draft',
             'rsvp_deadline' => $deadline,
+        ]);
+    }
+
+    private function publish(Event $event): EventPublication
+    {
+        $builder = app(InvitationPublicationSnapshotBuilder::class);
+        $snapshot = $builder->build($event->fresh());
+
+        return EventPublication::create([
+            'event_id' => $event->id,
+            'version' => $event->publications()->count() + 1,
+            'snapshot' => $snapshot,
+            'snapshot_hash' => $builder->hashSnapshot($snapshot),
+            'published_at' => now(),
         ]);
     }
 }

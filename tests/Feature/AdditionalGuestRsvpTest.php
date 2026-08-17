@@ -6,8 +6,10 @@ use App\Models\Customer;
 use App\Models\Event;
 use App\Models\EventMealOption;
 use App\Models\EventPackage;
+use App\Models\EventPublication;
 use App\Models\InvitationParty;
 use App\Models\RsvpPersonResponse;
+use App\Support\InvitationPublicationSnapshotBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -20,6 +22,7 @@ class AdditionalGuestRsvpTest extends TestCase
     {
         $event = $this->event();
         $meal = $event->mealOptions()->create(['name' => 'Chicken', 'is_active' => true]);
+        $this->publish($event);
 
         $zero = $this->partyWithTwoMembers($event, 'Zero');
         $this->get(route('public.rsvp.show', $zero->rsvp_token))->assertInertia(fn (Assert $page) => $page
@@ -49,6 +52,7 @@ class AdditionalGuestRsvpTest extends TestCase
     {
         $event = $this->event();
         $party = $this->partyWithTwoMembers($event, 'Capacity');
+        $this->publish($event);
         $threeGuests = [
             ['first_name' => 'One', 'member_type' => 'adult'],
             ['first_name' => 'Two', 'member_type' => 'adult'],
@@ -67,6 +71,7 @@ class AdditionalGuestRsvpTest extends TestCase
     {
         $event = $this->event();
         $party = $this->partyWithTwoMembers($event, 'Update');
+        $this->publish($event);
         $initial = [
             ['first_name' => 'Alex', 'last_name' => 'Williams', 'member_type' => 'adult'],
             ['first_name' => 'Sam', 'last_name' => 'Williams', 'member_type' => 'child'],
@@ -121,6 +126,20 @@ class AdditionalGuestRsvpTest extends TestCase
             'host_name' => 'Host',
             'status' => 'draft',
             'rsvp_deadline' => now()->addWeek()->toDateString(),
+        ]);
+    }
+
+    private function publish(Event $event): EventPublication
+    {
+        $builder = app(InvitationPublicationSnapshotBuilder::class);
+        $snapshot = $builder->build($event->fresh());
+
+        return EventPublication::create([
+            'event_id' => $event->id,
+            'version' => $event->publications()->count() + 1,
+            'snapshot' => $snapshot,
+            'snapshot_hash' => $builder->hashSnapshot($snapshot),
+            'published_at' => now(),
         ]);
     }
 }

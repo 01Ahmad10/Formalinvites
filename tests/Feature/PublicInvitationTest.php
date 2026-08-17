@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\Event;
 use App\Models\EventPackage;
+use App\Models\EventPublication;
 use App\Models\InvitationParty;
 use App\Models\Template;
 use App\Models\User;
 use App\Support\InvitationTemplateSettings;
+use App\Support\InvitationPublicationSnapshotBuilder;
 use App\Support\PublicRsvpPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -28,6 +30,7 @@ class PublicInvitationTest extends TestCase
         $other = InvitationParty::create(['event_id' => $event->id, 'name' => 'Private Party', 'maximum_party_size' => 1]);
         $event->activities()->create(['title' => 'Ceremony', 'activity_type' => 'ceremony', 'starts_at' => '2026-08-12 13:00:00+00', 'is_active' => true]);
         $event->activities()->create(['title' => 'Private planning', 'activity_type' => 'other', 'starts_at' => '2026-08-12 14:00:00+00', 'is_active' => false]);
+        $this->publish($event);
 
         $this->get(route('public.invitation.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page
             ->component('PublicInvitation')
@@ -55,6 +58,7 @@ class PublicInvitationTest extends TestCase
     {
         [$event] = $this->eventWithRomanticTemplate();
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Party', 'maximum_party_size' => 1]);
+        $this->publish($event);
         $admin = User::factory()->create(['role' => 'admin']);
         $oldToken = $party->rsvp_token;
 
@@ -74,6 +78,7 @@ class PublicInvitationTest extends TestCase
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'The Lee Family', 'maximum_party_size' => 1]);
         $event->activities()->create(['title' => 'Private Ceremony', 'activity_type' => 'ceremony', 'starts_at' => '2026-09-12 19:00:00+00', 'is_active' => true]);
         $event->activities()->create(['title' => 'Internal planning', 'activity_type' => 'other', 'starts_at' => '2026-09-12 20:00:00+00', 'is_active' => false]);
+        $this->publish($event);
 
         $this->get(route('public.invitation.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page
             ->component('PublicInvitation')
@@ -107,6 +112,7 @@ class PublicInvitationTest extends TestCase
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'The Smith Family', 'maximum_party_size' => 1]);
         $event->activities()->create(['title' => 'Ceremony', 'activity_type' => 'ceremony', 'starts_at' => '2026-09-12 20:00:00+00', 'is_active' => true]);
         $event->activities()->create(['title' => 'Internal planning', 'activity_type' => 'other', 'starts_at' => '2026-09-12 21:00:00+00', 'is_active' => false]);
+        $this->publish($event);
 
         $this->get(route('public.invitation.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page
             ->component('PublicInvitation')
@@ -141,6 +147,7 @@ class PublicInvitationTest extends TestCase
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Party', 'maximum_party_size' => 2]);
         $member = $party->members()->create(['first_name' => 'Nadia', 'member_type' => 'adult']);
         $meal = $event->mealOptions()->create(['name' => 'Chicken', 'is_active' => true]);
+        $this->publish($event);
         $payload = app(PublicRsvpPayload::class);
         $publicMember = $payload->invitationParty($party)['members'][0]['id'];
         $publicMeal = $payload->invitationMeals($party)[0]['id'];
@@ -173,6 +180,7 @@ class PublicInvitationTest extends TestCase
     {
         [$event] = $this->eventWithRomanticTemplate();
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Legacy party', 'maximum_party_size' => 1]);
+        $this->publish($event);
 
         $this->from(route('public.rsvp.show', $party->rsvp_token))
             ->post(route('public.rsvp.submit', $party->rsvp_token), ['status' => 'not_attending'])
@@ -190,6 +198,7 @@ class PublicInvitationTest extends TestCase
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Closed party', 'maximum_party_size' => 1]);
         $party->rsvp->update(['status' => 'attending', 'submitted_at' => now(), 'last_updated_at' => now()]);
         $event->update(['rsvp_deadline' => now()->subDay()->toDateString()]);
+        $this->publish($event);
 
         $this->get(route('public.invitation.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page
             ->component('PublicInvitation')
@@ -211,5 +220,19 @@ class PublicInvitationTest extends TestCase
     private function opaqueMemberKey(InvitationParty $party): string
     {
         return app(PublicRsvpPayload::class)->invitationParty($party)['members'][0]['id'];
+    }
+
+    private function publish(Event $event): EventPublication
+    {
+        $builder = app(InvitationPublicationSnapshotBuilder::class);
+        $snapshot = $builder->build($event->fresh());
+
+        return EventPublication::create([
+            'event_id' => $event->id,
+            'version' => $event->publications()->count() + 1,
+            'snapshot' => $snapshot,
+            'snapshot_hash' => $builder->hashSnapshot($snapshot),
+            'published_at' => now(),
+        ]);
     }
 }

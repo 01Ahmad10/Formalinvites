@@ -6,8 +6,10 @@ use App\Models\Customer;
 use App\Models\Event;
 use App\Models\EventActivity;
 use App\Models\EventPackage;
+use App\Models\EventPublication;
 use App\Models\InvitationParty;
 use App\Models\User;
+use App\Support\InvitationPublicationSnapshotBuilder;
 use Carbon\CarbonImmutable;
 use DateTimeZone;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -194,6 +196,7 @@ class EventActivityTest extends TestCase
         $event->activities()->create(['title' => 'Ceremony', 'activity_type' => 'ceremony', 'description' => 'Please be seated.', 'starts_at' => CarbonImmutable::parse('2026-10-15 18:00', 'America/New_York')->utc(), 'ends_at' => CarbonImmutable::parse('2026-10-15 19:00', 'America/New_York')->utc(), 'venue' => 'Garden', 'location_url' => 'https://maps.example.test/garden', 'display_order' => 1, 'is_active' => true]);
         $event->activities()->create(['title' => 'Private draft', 'starts_at' => CarbonImmutable::parse('2026-10-15 20:00', 'America/New_York')->utc(), 'is_active' => false]);
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Family', 'maximum_party_size' => 2]);
+        $this->publish($event);
 
         $this->get(route('public.rsvp.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page
             ->component('PublicRsvp')
@@ -232,5 +235,19 @@ class EventActivityTest extends TestCase
             'location_notes' => 'Use the east entrance.',
             'display_order' => 1,
         ], ...$overrides];
+    }
+
+    private function publish(Event $event): EventPublication
+    {
+        $builder = app(InvitationPublicationSnapshotBuilder::class);
+        $snapshot = $builder->build($event->fresh());
+
+        return EventPublication::create([
+            'event_id' => $event->id,
+            'version' => $event->publications()->count() + 1,
+            'snapshot' => $snapshot,
+            'snapshot_hash' => $builder->hashSnapshot($snapshot),
+            'published_at' => now(),
+        ]);
     }
 }

@@ -14,8 +14,8 @@ class Event extends Model
     use HasFactory;
     public const TYPES = ['wedding', 'engagement', 'bridal_shower', 'birthday', 'graduation', 'baptism', 'communion'];
     public const STATUSES = ['draft', 'submitted', 'under_review', 'changes_requested', 'approved', 'published', 'archived'];
-    protected $fillable = ['customer_id', 'event_package_id', 'template_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'event_timezone', 'dress_code', 'parking_information', 'transportation_information', 'accommodation_information', 'guest_information', 'status'];
-    protected function casts(): array { return ['main_date' => 'date', 'rsvp_deadline' => 'date']; }
+    protected $fillable = ['customer_id', 'event_package_id', 'template_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'event_timezone', 'dress_code', 'parking_information', 'transportation_information', 'accommodation_information', 'guest_information', 'status', 'submitted_snapshot_hash', 'submitted_at', 'approved_snapshot_hash', 'approved_at', 'approved_by', 'review_note'];
+    protected function casts(): array { return ['main_date' => 'date', 'rsvp_deadline' => 'date', 'submitted_at' => 'immutable_datetime', 'approved_at' => 'immutable_datetime']; }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function package(): BelongsTo { return $this->belongsTo(EventPackage::class, 'event_package_id'); }
     public function template(): BelongsTo { return $this->belongsTo(Template::class); }
@@ -25,6 +25,8 @@ class Event extends Model
     public function invitationParties(): HasMany { return $this->hasMany(InvitationParty::class); }
     public function mealOptions(): HasMany { return $this->hasMany(EventMealOption::class); }
     public function activities(): HasMany { return $this->hasMany(EventActivity::class); }
+    public function publications(): HasMany { return $this->hasMany(EventPublication::class); }
+    public function latestPublication(): ?EventPublication { return $this->publications()->orderByDesc('version')->first(); }
 
     public function rsvpDeadlineAt(): ?CarbonImmutable
     {

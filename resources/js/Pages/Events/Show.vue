@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 
-const props = defineProps<{ event: any; activities: any[]; guestInfo: Record<string, string | null>; customer: any; paymentSummary: any; canEdit: boolean; canViewGuests: boolean; canManageGuests: boolean; canViewRsvps: boolean; canManageRsvps: boolean; isAdmin: boolean }>();
+const props = defineProps<{ event: any; activities: any[]; guestInfo: Record<string, string | null>; customer: any; paymentSummary: any; canEdit: boolean; canViewGuests: boolean; canManageGuests: boolean; canViewRsvps: boolean; canManageRsvps: boolean; isAdmin: boolean; workflow: any }>();
 const value = (item: string | null | undefined) => item || 'Not provided';
 const date = (item: string | null | undefined) => item ? new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(`${item.slice(0, 10)}T00:00:00`)) : 'Not provided';
 const money = (item: string | number | null | undefined) => item === null || item === undefined ? 'Not provided' : `$${Number(item).toFixed(2)}`;
 const label = (item: string) => item.replaceAll('_', ' ');
+const submitReview = useForm({});
+const underReview = useForm({});
+const approve = useForm({});
+const publish = useForm({});
+const archive = useForm({});
+const requestChanges = useForm<Record<string, string>>({ review_note: '' });
 </script>
 
 <template>
@@ -21,6 +27,29 @@ const label = (item: string) => item.replaceAll('_', ' ');
         </template>
 
         <div class="mx-auto max-w-5xl space-y-6 p-6">
+            <section class="rounded bg-white p-6 shadow sm:rounded-lg">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold">Publishing</h3>
+                        <p class="mt-1 text-sm text-gray-600">Working review status: <span class="capitalize">{{ label(workflow.working_status) }}</span></p>
+                        <p class="mt-1 text-sm text-gray-600">Live invitation: <strong>{{ workflow.live_version ? `Version ${workflow.live_version}` : 'Not published' }}</strong></p>
+                        <p v-if="workflow.working_status === 'requires_submission'" class="mt-2 text-sm text-amber-700">This legacy approval has no Stage 7 snapshot approval. Submit the current working copy for review.</p>
+                        <p v-if="workflow.live_version" class="mt-1 text-sm" :class="workflow.unpublished_changes ? 'text-amber-700' : 'text-emerald-700'">{{ workflow.unpublished_changes ? 'Unpublished changes' : 'Working copy matches live version' }}</p>
+                        <p v-if="workflow.submitted_stale" class="mt-2 text-sm text-amber-700">The working copy changed after submission. Submit it again before Admin approval.</p>
+                        <p v-if="workflow.approved_stale" class="mt-2 text-sm text-amber-700">The working copy changed after approval. Submit and approve it again before publishing.</p>
+                        <p v-if="workflow.review_note" class="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>Changes requested:</strong> {{ workflow.review_note }}</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2"><Link :href="route('events.invitation.edit', event.id)" class="rounded border border-indigo-600 px-3 py-2 text-sm text-indigo-700">Preview Working Copy</Link><Link v-if="workflow.live_version" :href="route('events.invitation.live-preview', event.id)" class="rounded border border-gray-300 px-3 py-2 text-sm">View Live Version</Link></div>
+                </div>
+                <div v-if="workflow.can_submit || workflow.can_mark_under_review || workflow.can_approve || workflow.can_publish || workflow.can_archive" class="mt-5 flex flex-wrap items-center gap-2 border-t pt-4">
+                    <button v-if="workflow.can_submit" :disabled="submitReview.processing" class="rounded bg-indigo-600 px-3 py-2 text-sm text-white disabled:opacity-60" @click="submitReview.post(route('events.publication.submit', event.id))">Submit for Review</button>
+                    <button v-if="workflow.can_mark_under_review" :disabled="underReview.processing" class="rounded border border-indigo-600 px-3 py-2 text-sm text-indigo-700 disabled:opacity-60" @click="underReview.patch(route('events.publication.under-review', event.id))">Mark Under Review</button>
+                    <button v-if="workflow.can_approve" :disabled="approve.processing" class="rounded bg-emerald-600 px-3 py-2 text-sm text-white disabled:opacity-60" @click="approve.patch(route('events.publication.approve', event.id))">Approve</button>
+                    <button v-if="workflow.can_publish" :disabled="publish.processing" class="rounded bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-60" @click="publish.post(route('events.publication.publish', event.id))">Publish</button>
+                    <button v-if="workflow.can_archive" :disabled="archive.processing" class="rounded border border-red-300 px-3 py-2 text-sm text-red-700 disabled:opacity-60" @click="archive.patch(route('events.publication.archive', event.id))">Archive</button>
+                </div>
+                <form v-if="workflow.can_request_changes" class="mt-3 flex flex-wrap gap-2" @submit.prevent="requestChanges.patch(route('events.publication.request-changes', event.id))"><input v-model="requestChanges.review_note" required maxlength="2000" placeholder="Concise change request" class="min-w-64 rounded border-gray-300 text-sm"><button :disabled="requestChanges.processing" class="rounded border border-amber-500 px-3 py-2 text-sm text-amber-800 disabled:opacity-60">Request Changes</button><p v-if="requestChanges.errors.review_note || requestChanges.errors.workflow" class="w-full text-sm text-red-700">{{ requestChanges.errors.review_note || requestChanges.errors.workflow }}</p></form>
+            </section>
             <section class="rounded bg-white p-6 shadow sm:rounded-lg"><h3 class="mb-4 text-lg font-semibold">Basic Information</h3><dl class="grid gap-4 sm:grid-cols-2"><div><dt class="text-sm text-gray-500">Event title</dt><dd>{{ event.title }}</dd></div><div><dt class="text-sm text-gray-500">Event type</dt><dd class="capitalize">{{ label(event.event_type) }}</dd></div><div><dt class="text-sm text-gray-500">Host name</dt><dd>{{ value(event.host_name) }}</dd></div><div><dt class="text-sm text-gray-500">Second host / partner</dt><dd>{{ value(event.second_host_name) }}</dd></div><div class="sm:col-span-2"><dt class="text-sm text-gray-500">Description</dt><dd class="whitespace-pre-line">{{ value(event.description) }}</dd></div><div><dt class="text-sm text-gray-500">Current status</dt><dd class="capitalize">{{ label(event.status) }}</dd></div></dl></section>
 
             <section class="rounded bg-white p-6 shadow sm:rounded-lg"><h3 class="mb-4 text-lg font-semibold">Date &amp; Time</h3><dl class="grid gap-4 sm:grid-cols-2"><div><dt class="text-sm text-gray-500">Main date</dt><dd>{{ date(event.main_date) }}</dd></div><div><dt class="text-sm text-gray-500">RSVP deadline</dt><dd>{{ date(event.rsvp_deadline) }}</dd></div><div><dt class="text-sm text-gray-500">Start time</dt><dd>{{ value(event.start_time) }}</dd></div><div><dt class="text-sm text-gray-500">End time</dt><dd>{{ value(event.end_time) }}</dd></div><div class="sm:col-span-2"><dt class="text-sm text-gray-500">Event timezone</dt><dd>{{ value(event.event_timezone) }}</dd></div></dl></section>

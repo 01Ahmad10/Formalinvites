@@ -125,9 +125,9 @@ class StageOneAuthorizationTest extends TestCase
         $package = EventPackage::create(['name'=>'Assigned','minimum_guests'=>1,'maximum_guests'=>50,'price'=>25,'is_active'=>true]);
         $event = Event::create(['customer_id'=>$customer->id,'title'=>'Old','event_type'=>'birthday','host_name'=>'Old Host','status'=>'draft']);
 
-        $this->actingAs($admin)->put(route('events.update', $event), ['customer_id'=>$customer->id,'event_package_id'=>$package->id,'title'=>'Updated Event','event_type'=>'wedding','host_name'=>'Primary Host','second_host_name'=>'Second Host','description'=>'Updated description','main_date'=>'2026-12-20','start_time'=>'18:00','end_time'=>'23:00','venue'=>'Updated Venue','address'=>'10 Updated Street','location_url'=>'https://example.test/updated','rsvp_deadline'=>'2026-12-10','status'=>'approved'])->assertRedirect(route('events.show', $event));
+        $this->actingAs($admin)->put(route('events.update', $event), ['customer_id'=>$customer->id,'event_package_id'=>$package->id,'title'=>'Updated Event','event_type'=>'wedding','host_name'=>'Primary Host','second_host_name'=>'Second Host','description'=>'Updated description','main_date'=>'2026-12-20','start_time'=>'18:00','end_time'=>'23:00','venue'=>'Updated Venue','address'=>'10 Updated Street','location_url'=>'https://example.test/updated','rsvp_deadline'=>'2026-12-10','status'=>'draft'])->assertRedirect(route('events.show', $event));
 
-        $this->assertDatabaseHas('events', ['id'=>$event->id,'event_package_id'=>$package->id,'title'=>'Updated Event','event_type'=>'wedding','host_name'=>'Primary Host','second_host_name'=>'Second Host','venue'=>'Updated Venue','address'=>'10 Updated Street','location_url'=>'https://example.test/updated','status'=>'approved']);
+        $this->assertDatabaseHas('events', ['id'=>$event->id,'event_package_id'=>$package->id,'title'=>'Updated Event','event_type'=>'wedding','host_name'=>'Primary Host','second_host_name'=>'Second Host','venue'=>'Updated Venue','address'=>'10 Updated Street','location_url'=>'https://example.test/updated','status'=>'draft']);
     }
 
     public function test_customer_can_edit_permitted_content_but_cannot_change_package_or_admin_only_status(): void
@@ -138,14 +138,14 @@ class StageOneAuthorizationTest extends TestCase
         $other = EventPackage::create(['name'=>'Other','minimum_guests'=>51,'maximum_guests'=>100,'price'=>55,'is_active'=>true]);
         $event = Event::create(['customer_id'=>$customer->id,'event_package_id'=>$assigned->id,'title'=>'Original','event_type'=>'birthday','host_name'=>'Host','status'=>'draft']);
         $event->members()->attach($member, ['role'=>'editor']);
-        $payload = ['customer_id'=>$customer->id,'event_package_id'=>$other->id,'title'=>'Customer Update','event_type'=>'birthday','host_name'=>'Host','second_host_name'=>'','description'=>'Updated by member','main_date'=>'2026-12-20','start_time'=>'10:00','end_time'=>'12:00','venue'=>'Venue','address'=>'Address','location_url'=>'https://example.test/location','rsvp_deadline'=>'2026-12-10','status'=>'submitted'];
+        $payload = ['customer_id'=>$customer->id,'event_package_id'=>$other->id,'title'=>'Customer Update','event_type'=>'birthday','host_name'=>'Host','second_host_name'=>'','description'=>'Updated by member','main_date'=>'2026-12-20','start_time'=>'10:00','end_time'=>'12:00','venue'=>'Venue','address'=>'Address','location_url'=>'https://example.test/location','rsvp_deadline'=>'2026-12-10','status'=>'draft'];
 
         $this->actingAs($member)->put(route('events.update', $event), $payload)->assertRedirect(route('events.show', $event));
-        $this->assertDatabaseHas('events', ['id'=>$event->id,'title'=>'Customer Update','event_package_id'=>$assigned->id,'status'=>'submitted']);
+        $this->assertDatabaseHas('events', ['id'=>$event->id,'title'=>'Customer Update','event_package_id'=>$assigned->id,'status'=>'draft']);
 
         $payload['status'] = 'approved';
         $this->actingAs($member)->put(route('events.update', $event), $payload)->assertSessionHasErrors('status');
-        $this->assertDatabaseHas('events', ['id'=>$event->id,'status'=>'submitted','event_package_id'=>$assigned->id]);
+        $this->assertDatabaseHas('events', ['id'=>$event->id,'status'=>'draft','event_package_id'=>$assigned->id]);
     }
 
     public function test_unauthorized_customer_cannot_edit_another_customers_event(): void

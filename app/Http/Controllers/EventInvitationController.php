@@ -34,6 +34,7 @@ class EventInvitationController extends Controller
             'parties' => $event->invitationParties()->orderBy('name')->get(['id', 'name']),
             'canManage' => $request->user()->can('update', $event),
             'previewInvitation' => $presenter->present($event),
+            'liveVersion' => $event->publications()->orderByDesc('version')->value('version'),
         ]);
     }
 

@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 
-const props = defineProps<{ party: any; rsvp: any; meals: any[]; closed: boolean; confirmation: string | null; romantic?: boolean; editorial?: boolean }>();
+const props = defineProps<{ party: any; rsvp: any; meals: any[]; closed: boolean; confirmation: string | null; romantic?: boolean; editorial?: boolean; cinematic?: boolean }>();
 const hasSubmittedResponse = computed(() => ['attending', 'not_attending'].includes(props.rsvp?.status));
 const isEditing = ref(false);
 const previous = (id: number) => props.rsvp?.person_responses?.find((person: any) => person.party_member_id === id);
@@ -21,11 +21,11 @@ const submit = () => form.post(route('public.rsvp.submit', route().params.token)
 </script>
 
 <template>
-    <div :class="{ 'romantic-rsvp': romantic, 'editorial-rsvp': editorial }">
+    <div :class="{ 'romantic-rsvp': romantic, 'editorial-rsvp': editorial, 'cinematic-rsvp': cinematic }">
     <section v-if="hasSubmittedResponse && !isEditing" class="rounded-2xl border border-white/60 bg-white/90 p-6 shadow-sm backdrop-blur">
-        <p v-if="confirmation" class="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">{{ confirmation }}</p>
+        <p v-if="confirmation" class="rsvp-confirmation mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-800">{{ confirmation }}</p>
         <div class="flex items-start justify-between gap-4"><div><h2 class="font-serif text-2xl font-semibold">Your RSVP</h2><p class="mt-1 text-stone-700">Response: <strong>{{ rsvp.status === 'attending' ? 'Attending' : 'Not attending' }}</strong></p><p class="text-sm text-stone-500">Last updated: {{ rsvp.last_updated_at || rsvp.submitted_at }}</p></div><button v-if="!closed" type="button" class="rounded-full border border-stone-400 px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-rose-500" @click="isEditing = true">Edit RSVP</button></div>
-        <div v-if="rsvp.status === 'attending' && rsvp.person_responses?.length" class="mt-5 border-t border-stone-200 pt-4"><h3 class="font-medium">Guest responses</h3><div class="mt-3 space-y-2 text-sm"><div v-for="(person, index) in rsvp.person_responses" :key="person.party_member_id || `additional-${index}`" class="rounded-xl bg-rose-50/60 p-3"><strong>{{ person.first_name }} {{ person.last_name }}</strong><dl class="mt-2 space-y-1 text-stone-700"><div><dt class="inline font-medium">Status:</dt> <dd class="inline">{{ person.is_attending ? 'Attending' : 'Not attending' }}</dd></div><div v-if="!person.is_original_party_member"><dt class="inline font-medium">Guest type:</dt> <dd class="inline">{{ person.member_type === 'child' ? 'Child' : 'Adult' }}</dd></div><div v-if="person.is_attending && person.meal_option"><dt class="inline font-medium">Meal:</dt> <dd class="inline">{{ person.meal_option.name }}</dd></div><div v-if="person.is_attending && person.dietary_note"><dt class="inline font-medium">Dietary note:</dt> <dd class="inline">{{ person.dietary_note }}</dd></div></dl></div></div></div>
+        <div v-if="rsvp.status === 'attending' && rsvp.person_responses?.length" class="mt-5 border-t border-stone-200 pt-4"><h3 class="font-medium">Guest responses</h3><div class="mt-3 space-y-2 text-sm"><div v-for="(person, index) in rsvp.person_responses" :key="person.party_member_id || `additional-${index}`" class="rsvp-response-row rounded-xl bg-rose-50/60 p-3"><strong>{{ person.first_name }} {{ person.last_name }}</strong><dl class="mt-2 space-y-1 text-stone-700"><div><dt class="inline font-medium">Status:</dt> <dd class="inline">{{ person.is_attending ? 'Attending' : 'Not attending' }}</dd></div><div v-if="!person.is_original_party_member"><dt class="inline font-medium">Guest type:</dt> <dd class="inline">{{ person.member_type === 'child' ? 'Child' : 'Adult' }}</dd></div><div v-if="person.is_attending && person.meal_option"><dt class="inline font-medium">Meal:</dt> <dd class="inline">{{ person.meal_option.name }}</dd></div><div v-if="person.is_attending && person.dietary_note"><dt class="inline font-medium">Dietary note:</dt> <dd class="inline">{{ person.dietary_note }}</dd></div></dl></div></div></div>
         <div v-if="rsvp.guest_message" class="mt-4 border-t border-stone-200 pt-4"><h3 class="font-medium">Message to host</h3><p class="mt-1 whitespace-pre-line text-stone-700">{{ rsvp.guest_message }}</p></div>
     </section>
 
@@ -60,4 +60,22 @@ const submit = () => form.post(route('public.rsvp.submit', route().params.token)
 .editorial-rsvp button[type='submit'] { border-radius: 0; background: #1f1d1a; box-shadow: none; letter-spacing: 0.09em; text-transform: uppercase; }
 .editorial-rsvp button[type='submit']:hover { background: #3a3630; }
 .editorial-rsvp button[type='button'] { color: inherit; }
+.cinematic-rsvp { color: #eef0ed; }
+.cinematic-rsvp :is(section, form) { border: 1px solid rgba(210, 176, 106, 0.34); border-radius: 0.9rem; background: linear-gradient(145deg, rgba(18, 23, 35, 0.96), rgba(7, 9, 14, 0.98)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1.4rem 3rem rgba(0, 0, 0, 0.26); }
+.cinematic-rsvp h2, .cinematic-rsvp h3 { color: #f7f2e8; font-family: ui-serif, Georgia, serif; font-weight: 400; }
+.cinematic-rsvp :is(p, dl, label) { color: rgba(238, 240, 237, 0.82); }
+.cinematic-rsvp :is(input, select, textarea) { min-height: 2.85rem; border: 1px solid rgba(210, 176, 106, 0.35); border-radius: 0.55rem; background: rgba(255, 255, 255, 0.06); color: #f7f2e8; }
+.cinematic-rsvp select option { background: #111723; color: #f7f2e8; }
+.cinematic-rsvp input[type='radio'], .cinematic-rsvp input[type='checkbox'] { min-height: auto; accent-color: #d2b06a; }
+.cinematic-rsvp :is(input, select, textarea):focus { outline: 3px solid rgba(210, 176, 106, 0.34); outline-offset: 2px; }
+.cinematic-rsvp :is(.rounded-xl.border-stone-200, .rounded-xl.border-dashed) { border-color: rgba(210, 176, 106, 0.25); background: rgba(255, 255, 255, 0.035); }
+.cinematic-rsvp .rsvp-response-row { border: 1px solid rgba(210, 176, 106, 0.26); border-radius: 0.65rem; background: linear-gradient(135deg, rgba(4, 6, 10, 0.88), rgba(29, 34, 43, 0.78)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
+.cinematic-rsvp .rsvp-response-row strong { color: #f7f2e8; }
+.cinematic-rsvp .rsvp-response-row :is(dt, dd) { color: rgba(238, 240, 237, 0.82); }
+.cinematic-rsvp .rsvp-response-row dt { color: #d2b06a; }
+.cinematic-rsvp .rsvp-confirmation { border-color: rgba(111, 190, 153, 0.48); background: rgba(21, 65, 51, 0.62); color: #d9f5e8; }
+.cinematic-rsvp :is(.text-red-700, .text-rose-700) { color: #f6b0ae; }
+.cinematic-rsvp button[type='submit'] { border-radius: 0.45rem; background: #d2b06a; color: #10131c; box-shadow: 0 0.7rem 1.5rem rgba(0, 0, 0, 0.26); letter-spacing: 0.08em; text-transform: uppercase; }
+.cinematic-rsvp button[type='submit']:hover { background: #e1c788; }
+.cinematic-rsvp button[type='button'] { color: #e1c788; }
 </style>

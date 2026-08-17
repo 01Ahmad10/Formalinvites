@@ -3,10 +3,11 @@ import { computed } from 'vue';
 import ElegantClassic from './InvitationTemplates/ElegantClassic.vue';
 import EditorialLuxury from './InvitationTemplates/EditorialLuxury.vue';
 import ModernMinimal from './InvitationTemplates/ModernMinimal.vue';
+import ModernCinematic from './InvitationTemplates/ModernCinematic.vue';
 import RomanticFloral from './InvitationTemplates/RomanticFloral.vue';
 
 const props = defineProps<{ invitation: any }>();
-const registry: Record<string, any> = { 'elegant-classic': ElegantClassic, 'modern-minimal': ModernMinimal, 'romantic-floral': RomanticFloral, 'editorial-luxury': EditorialLuxury };
+const registry: Record<string, any> = { 'elegant-classic': ElegantClassic, 'modern-minimal': ModernMinimal, 'romantic-floral': RomanticFloral, 'editorial-luxury': EditorialLuxury, 'modern-cinematic': ModernCinematic };
 const component = computed(() => props.invitation.template ? registry[props.invitation.template.component_key] : null);
 </script>
 

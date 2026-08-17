@@ -98,6 +98,43 @@ class PublicInvitationTest extends TestCase
         $this->assertSame('Updated response.', $party->fresh()->rsvp->guest_message);
     }
 
+    public function test_modern_cinematic_public_invitation_uses_safe_data_active_activities_and_the_existing_rsvp_lifecycle(): void
+    {
+        $customer = Customer::create(['name' => 'Cinematic Customer']);
+        $package = EventPackage::create(['name' => 'Cinematic Package', 'minimum_guests' => 1, 'maximum_guests' => 50, 'price' => 25, 'is_active' => true]);
+        $template = Template::create(['name' => 'Modern Cinematic', 'slug' => 'cinematic-'.uniqid(), 'component_key' => 'modern-cinematic', 'default_settings' => InvitationTemplateSettings::modernCinematicDefaults(), 'is_active' => true]);
+        $event = Event::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'template_id' => $template->id, 'title' => 'An Evening in Motion', 'event_type' => 'engagement', 'host_name' => 'Maya', 'second_host_name' => 'Elias', 'event_timezone' => 'America/New_York', 'main_date' => '2026-09-12', 'start_time' => '16:00', 'end_time' => '17:00', 'status' => 'draft', 'rsvp_deadline' => now()->addWeek()->toDateString(), 'venue' => 'The Observatory']);
+        $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'The Smith Family', 'maximum_party_size' => 1]);
+        $event->activities()->create(['title' => 'Ceremony', 'activity_type' => 'ceremony', 'starts_at' => '2026-09-12 20:00:00+00', 'is_active' => true]);
+        $event->activities()->create(['title' => 'Internal planning', 'activity_type' => 'other', 'starts_at' => '2026-09-12 21:00:00+00', 'is_active' => false]);
+
+        $this->get(route('public.invitation.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page
+            ->component('PublicInvitation')
+            ->where('invitation.template.component_key', 'modern-cinematic')
+            ->where('invitation.settings.palette_key', 'midnight_gold')
+            ->where('invitation.settings.font_pair_key', 'cinematic_serif')
+            ->where('invitation.party_name', 'The Smith Family')
+            ->where('invitation.event.start_time', '4:00 PM')
+            ->has('invitation.event.activities', 1)
+            ->where('invitation.event.activities.0.title', 'Ceremony')
+            ->where('invitation.experience.intro_video', null)
+            ->where('invitation.experience.audio', null)
+            ->missing('invitation.event.customer_id')
+            ->missing('invitation.event.package')
+            ->missing('invitation.event.payment')
+        );
+
+        $this->from(route('public.invitation.show', $party->rsvp_token))
+            ->post(route('public.rsvp.submit', $party->rsvp_token), ['status' => 'not_attending', 'guest_message' => 'We will celebrate from afar.'])
+            ->assertRedirect(route('public.invitation.show', $party->rsvp_token));
+        $this->from(route('public.invitation.show', $party->rsvp_token))
+            ->post(route('public.rsvp.submit', $party->rsvp_token), ['status' => 'not_attending', 'guest_message' => 'Updated cinematic response.'])
+            ->assertRedirect(route('public.invitation.show', $party->rsvp_token));
+
+        $this->assertSame(1, $party->fresh()->rsvp()->count());
+        $this->assertSame('Updated cinematic response.', $party->fresh()->rsvp->guest_message);
+    }
+
     public function test_public_invitation_can_submit_and_update_its_existing_rsvp_with_opaque_member_keys(): void
     {
         [$event] = $this->eventWithRomanticTemplate();

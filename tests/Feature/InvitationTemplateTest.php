@@ -105,11 +105,60 @@ class InvitationTemplateTest extends TestCase
         ])->assertSessionHasErrors('settings.font_pair_key');
     }
 
+    public function test_modern_cinematic_is_active_selectable_and_accepts_only_its_approved_settings(): void
+    {
+        [$event, $editor] = $this->eventWithEditor();
+        $template = $this->template([
+            'name' => 'Modern Cinematic',
+            'slug' => 'modern-cinematic',
+            'category' => 'cinematic',
+            'component_key' => 'modern-cinematic',
+            'default_settings' => InvitationTemplateSettings::modernCinematicDefaults(),
+        ]);
+
+        $this->assertTrue($template->is_active);
+        $this->actingAs($editor)->put(route('events.invitation.update', $event), [
+            'template_id' => $template->id,
+            'settings' => ['palette_key' => 'emerald_night', 'font_pair_key' => 'contemporary'],
+        ])->assertRedirect();
+
+        $this->actingAs($editor)->get(route('events.invitation.preview', $event))->assertInertia(fn (Assert $page) => $page
+            ->component('Events/InvitationPreview')
+            ->where('invitation.template.component_key', 'modern-cinematic')
+            ->where('invitation.settings.palette_key', 'emerald_night')
+            ->where('invitation.settings.primary_color', '#D2B06A')
+            ->where('invitation.settings.font_pair_key', 'contemporary')
+            ->where('invitation.settings.heading_font', 'modern_sans')
+        );
+
+        $this->actingAs($editor)->put(route('events.invitation.update', $event), [
+            'template_id' => $template->id,
+            'settings' => ['palette_key' => 'burgundy'],
+        ])->assertSessionHasErrors('settings.palette_key');
+        $this->actingAs($editor)->put(route('events.invitation.update', $event), [
+            'template_id' => $template->id,
+            'settings' => ['font_pair_key' => 'editorial'],
+        ])->assertSessionHasErrors('settings.font_pair_key');
+    }
+
     public function test_editorial_luxury_is_seeded_active_without_overriding_a_later_admin_deactivation(): void
     {
         $this->seed();
 
         $template = Template::where('slug', 'editorial-luxury')->firstOrFail();
+        $this->assertTrue($template->is_active);
+
+        $template->update(['is_active' => false]);
+        $this->seed();
+
+        $this->assertFalse($template->fresh()->is_active);
+    }
+
+    public function test_modern_cinematic_is_seeded_active_without_overriding_a_later_admin_deactivation(): void
+    {
+        $this->seed();
+
+        $template = Template::where('slug', 'modern-cinematic')->firstOrFail();
         $this->assertTrue($template->is_active);
 
         $template->update(['is_active' => false]);

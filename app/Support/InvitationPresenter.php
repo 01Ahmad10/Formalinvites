@@ -66,6 +66,7 @@ class InvitationPresenter
         return match ($componentKey) {
             'romantic-floral' => ['intro_video' => null, 'audio' => null],
             'editorial-luxury' => ['intro_video' => null, 'audio' => null],
+            'modern-cinematic' => ['intro_video' => null, 'audio' => null],
             default => ['intro_video' => null, 'audio' => null],
         };
     }

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Template extends Model
 {
-    public const COMPONENT_KEYS = ['elegant-classic', 'modern-minimal', 'romantic-floral'];
+    public const COMPONENT_KEYS = ['elegant-classic', 'modern-minimal', 'romantic-floral', 'editorial-luxury'];
 
     protected $fillable = ['name', 'slug', 'description', 'category', 'component_key', 'supported_event_types', 'default_settings', 'is_active', 'display_order'];
 

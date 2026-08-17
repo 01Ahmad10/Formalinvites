@@ -34,6 +34,28 @@ class InvitationTemplateSettings
         ];
     }
 
+    public static function editorialLuxuryDefaults(): array
+    {
+        return [
+            ...self::defaults(),
+            'palette_key' => 'champagne_noir',
+            'font_pair_key' => 'editorial',
+            'palettes' => [
+                'monochrome' => ['label' => 'Monochrome', 'primary_color' => '#111111', 'secondary_color' => '#E9E4DD', 'accent_color' => '#8C8780', 'background_color' => '#F7F4EF', 'text_color' => '#171717'],
+                'champagne_noir' => ['label' => 'Champagne Noir', 'primary_color' => '#1F1D1A', 'secondary_color' => '#D5B77A', 'accent_color' => '#A8874A', 'background_color' => '#F7F2E8', 'text_color' => '#1F1D1A'],
+                'deep_emerald' => ['label' => 'Deep Emerald', 'primary_color' => '#123D35', 'secondary_color' => '#D7C7A5', 'accent_color' => '#B6965D', 'background_color' => '#F8F4EB', 'text_color' => '#182522'],
+                'midnight' => ['label' => 'Midnight', 'primary_color' => '#13223A', 'secondary_color' => '#E9E1D2', 'accent_color' => '#9F8761', 'background_color' => '#F6F3ED', 'text_color' => '#172033'],
+            ],
+            'font_pairs' => [
+                'editorial' => ['label' => 'Editorial', 'heading_font' => 'elegant_serif', 'body_font' => 'sans'],
+                'modern_serif' => ['label' => 'Modern Serif', 'heading_font' => 'classic_serif', 'body_font' => 'serif'],
+                'contemporary' => ['label' => 'Contemporary', 'heading_font' => 'modern_sans', 'body_font' => 'sans'],
+            ],
+            'text_alignment' => 'left',
+            'layout_variant' => 'standard',
+        ];
+    }
+
     public static function resolve(?array $templateDefaults, ?array $eventSettings): array
     {
         $definition = self::definition($templateDefaults);

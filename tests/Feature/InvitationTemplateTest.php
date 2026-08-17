@@ -71,6 +71,53 @@ class InvitationTemplateTest extends TestCase
         );
     }
 
+    public function test_editorial_luxury_is_selectable_with_only_its_approved_palettes_and_typography(): void
+    {
+        [$event, $editor] = $this->eventWithEditor();
+        $template = $this->template([
+            'name' => 'Editorial Luxury',
+            'slug' => 'editorial-luxury',
+            'category' => 'editorial',
+            'component_key' => 'editorial-luxury',
+            'default_settings' => InvitationTemplateSettings::editorialLuxuryDefaults(),
+        ]);
+
+        $this->actingAs($editor)->put(route('events.invitation.update', $event), [
+            'template_id' => $template->id,
+            'settings' => ['palette_key' => 'deep_emerald', 'font_pair_key' => 'contemporary'],
+        ])->assertRedirect();
+
+        $this->actingAs($editor)->get(route('events.invitation.preview', $event))->assertInertia(fn (Assert $page) => $page
+            ->where('invitation.template.component_key', 'editorial-luxury')
+            ->where('invitation.settings.palette_key', 'deep_emerald')
+            ->where('invitation.settings.primary_color', '#123D35')
+            ->where('invitation.settings.font_pair_key', 'contemporary')
+            ->where('invitation.settings.heading_font', 'modern_sans')
+        );
+
+        $this->actingAs($editor)->put(route('events.invitation.update', $event), [
+            'template_id' => $template->id,
+            'settings' => ['palette_key' => 'burgundy'],
+        ])->assertSessionHasErrors('settings.palette_key');
+        $this->actingAs($editor)->put(route('events.invitation.update', $event), [
+            'template_id' => $template->id,
+            'settings' => ['font_pair_key' => 'classic'],
+        ])->assertSessionHasErrors('settings.font_pair_key');
+    }
+
+    public function test_editorial_luxury_is_seeded_active_without_overriding_a_later_admin_deactivation(): void
+    {
+        $this->seed();
+
+        $template = Template::where('slug', 'editorial-luxury')->firstOrFail();
+        $this->assertTrue($template->is_active);
+
+        $template->update(['is_active' => false]);
+        $this->seed();
+
+        $this->assertFalse($template->fresh()->is_active);
+    }
+
     public function test_legacy_event_level_design_settings_are_retained_but_not_used_for_rendering(): void
     {
         [$event, $editor] = $this->eventWithEditor();

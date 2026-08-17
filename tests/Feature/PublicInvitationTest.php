@@ -65,6 +65,39 @@ class PublicInvitationTest extends TestCase
         $this->get(route('public.invitation.show', $party->rsvp_token))->assertOk();
     }
 
+    public function test_editorial_luxury_public_invitation_uses_safe_event_data_and_keeps_rsvp_inside_the_invitation(): void
+    {
+        $customer = Customer::create(['name' => 'Editorial Customer']);
+        $package = EventPackage::create(['name' => 'Editorial Package', 'minimum_guests' => 1, 'maximum_guests' => 50, 'price' => 25, 'is_active' => true]);
+        $template = Template::create(['name' => 'Editorial Luxury', 'slug' => 'editorial-'.uniqid(), 'component_key' => 'editorial-luxury', 'default_settings' => InvitationTemplateSettings::editorialLuxuryDefaults(), 'is_active' => true]);
+        $event = Event::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'template_id' => $template->id, 'title' => 'The Edit', 'event_type' => 'wedding', 'host_name' => 'Avery', 'second_host_name' => 'Morgan', 'event_timezone' => 'America/New_York', 'main_date' => '2026-09-12', 'status' => 'draft', 'rsvp_deadline' => now()->addWeek()->toDateString(), 'venue' => 'The Gallery', 'guest_information' => 'Arrive fifteen minutes early.']);
+        $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'The Lee Family', 'maximum_party_size' => 1]);
+        $event->activities()->create(['title' => 'Private Ceremony', 'activity_type' => 'ceremony', 'starts_at' => '2026-09-12 19:00:00+00', 'is_active' => true]);
+        $event->activities()->create(['title' => 'Internal planning', 'activity_type' => 'other', 'starts_at' => '2026-09-12 20:00:00+00', 'is_active' => false]);
+
+        $this->get(route('public.invitation.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page
+            ->component('PublicInvitation')
+            ->where('invitation.template.component_key', 'editorial-luxury')
+            ->where('invitation.party_name', 'The Lee Family')
+            ->where('invitation.settings.palette_key', 'champagne_noir')
+            ->where('invitation.settings.font_pair_key', 'editorial')
+            ->has('invitation.event.activities', 1)
+            ->missing('invitation.event.customer_id')
+            ->missing('invitation.event.payment')
+            ->missing('invitation.event.package')
+        );
+
+        $this->from(route('public.invitation.show', $party->rsvp_token))
+            ->post(route('public.rsvp.submit', $party->rsvp_token), ['status' => 'not_attending', 'guest_message' => 'Regretfully unavailable.'])
+            ->assertRedirect(route('public.invitation.show', $party->rsvp_token));
+        $this->from(route('public.invitation.show', $party->rsvp_token))
+            ->post(route('public.rsvp.submit', $party->rsvp_token), ['status' => 'not_attending', 'guest_message' => 'Updated response.'])
+            ->assertRedirect(route('public.invitation.show', $party->rsvp_token));
+
+        $this->assertSame(1, $party->fresh()->rsvp()->count());
+        $this->assertSame('Updated response.', $party->fresh()->rsvp->guest_message);
+    }
+
     public function test_public_invitation_can_submit_and_update_its_existing_rsvp_with_opaque_member_keys(): void
     {
         [$event] = $this->eventWithRomanticTemplate();

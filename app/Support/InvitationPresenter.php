@@ -65,6 +65,7 @@ class InvitationPresenter
         // without media assets, so both safely fall back to the visual intro.
         return match ($componentKey) {
             'romantic-floral' => ['intro_video' => null, 'audio' => null],
+            'editorial-luxury' => ['intro_video' => null, 'audio' => null],
             default => ['intro_video' => null, 'audio' => null],
         };
     }

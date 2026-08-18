@@ -26,7 +26,7 @@ const bodyFamily = computed(() => props.invitation.settings.body_font === 'serif
             <section v-if="invitation.event.main_date" class="reveal-on-scroll editorial-date-block">
                 <p class="editorial-index">01 / DATE</p>
                 <p class="editorial-date">{{ invitation.event.main_date }}</p>
-                <p class="editorial-time">{{ invitation.event.start_time || 'Time to be confirmed' }}<span v-if="invitation.event.end_time"> — {{ invitation.event.end_time }}</span></p>
+                <p class="editorial-time">{{ invitation.event.start_time || 'Time to be confirmed' }}<span v-if="invitation.event.end_time"> — <span v-if="invitation.event.end_date && invitation.event.end_date !== invitation.event.main_date">{{ invitation.event.end_date }}, </span>{{ invitation.event.end_time }}</span></p>
                 <p class="editorial-timezone">{{ invitation.event.timezone }}</p>
             </section>
 

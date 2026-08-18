@@ -8,6 +8,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
+use App\Support\EventPublicationService;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,7 +22,7 @@ class EventActivityController extends Controller
         return Inertia::render('Events/Activities/Index', [
             'event' => $this->eventForPresentation($event),
             'activities' => $event->activities()->orderBy('display_order')->orderBy('starts_at')->get()->map(fn ($activity) => $this->activityForPresentation($activity, $event))->values(),
-            'canManage' => $request->user()->can('update', $event),
+            'canManage' => $request->user()->can('update', $event), 'fromSetup' => $request->boolean('from_setup'),
         ]);
     }
 
@@ -28,15 +30,16 @@ class EventActivityController extends Controller
     {
         $this->manage($request, $event);
 
-        return Inertia::render('Events/Activities/Form', ['event' => $this->eventForPresentation($event), 'activity' => null]);
+        return Inertia::render('Events/Activities/Form', ['event' => $this->eventForPresentation($event), 'activity' => null, 'fromSetup' => $request->boolean('from_setup')]);
     }
 
-    public function store(Request $request, Event $event): RedirectResponse
+    public function store(Request $request, Event $event, EventPublicationService $publications): RedirectResponse
     {
         $this->manage($request, $event);
-        $event->activities()->create($this->validated($request, $event));
+        $data = $this->validated($request, $event);
+        DB::transaction(function () use ($event, $data, $request, $publications): void { $locked = Event::query()->lockForUpdate()->findOrFail($event->id); $locked->activities()->create($data); $publications->publishIfActiveLocked($locked, $request->user()); });
 
-        return to_route('events.activities.index', $event)->with('success', 'Activity added.');
+        return $request->boolean('from_setup') ? to_route('events.setup', ['event' => $event, 'step' => 3])->with('success', 'Activity added.') : to_route('events.activities.index', $event)->with('success', 'Activity added.');
     }
 
     public function show(Request $request, Event $event, EventActivity $activity): Response
@@ -52,24 +55,25 @@ class EventActivityController extends Controller
         $this->manage($request, $event);
         $activity = $this->activityForEvent($event, $activity);
 
-        return Inertia::render('Events/Activities/Form', ['event' => $this->eventForPresentation($event), 'activity' => $this->activityForForm($activity, $event)]);
+        return Inertia::render('Events/Activities/Form', ['event' => $this->eventForPresentation($event), 'activity' => $this->activityForForm($activity, $event), 'fromSetup' => $request->boolean('from_setup')]);
     }
 
-    public function update(Request $request, Event $event, EventActivity $activity): RedirectResponse
+    public function update(Request $request, Event $event, EventActivity $activity, EventPublicationService $publications): RedirectResponse
     {
         $this->manage($request, $event);
         $activity = $this->activityForEvent($event, $activity);
-        $activity->update($this->validated($request, $event));
+        $data = $this->validated($request, $event);
+        DB::transaction(function () use ($event, $activity, $data, $request, $publications): void { $locked = Event::query()->lockForUpdate()->findOrFail($event->id); $lockedActivity = $this->activityForEvent($locked, EventActivity::findOrFail($activity->id)); $lockedActivity->update($data); $publications->publishIfActiveLocked($locked, $request->user()); });
 
-        return to_route('events.activities.show', [$event, $activity])->with('success', 'Activity updated.');
+        return $request->boolean('from_setup') ? to_route('events.setup', ['event' => $event, 'step' => 3])->with('success', 'Activity updated.') : to_route('events.activities.show', [$event, $activity])->with('success', 'Activity updated.');
     }
 
-    public function setActive(Request $request, Event $event, EventActivity $activity): RedirectResponse
+    public function setActive(Request $request, Event $event, EventActivity $activity, EventPublicationService $publications): RedirectResponse
     {
         $this->manage($request, $event);
         $activity = $this->activityForEvent($event, $activity);
         $data = $request->validate(['is_active' => ['required', 'boolean']]);
-        $activity->update($data);
+        DB::transaction(function () use ($event, $activity, $data, $request, $publications): void { $locked = Event::query()->lockForUpdate()->findOrFail($event->id); $lockedActivity = $this->activityForEvent($locked, EventActivity::findOrFail($activity->id)); $lockedActivity->update($data); $publications->publishIfActiveLocked($locked, $request->user()); });
 
         return back()->with('success', $data['is_active'] ? 'Activity activated.' : 'Activity deactivated.');
     }
@@ -110,7 +114,7 @@ class EventActivityController extends Controller
     private function view(Request $request, Event $event): void { abort_unless($request->user()->can('view', $event), 403); }
     private function manage(Request $request, Event $event): void { abort_unless($request->user()->can('update', $event), 403); }
     private function activityForEvent(Event $event, EventActivity $activity): EventActivity { abort_unless($activity->event_id === $event->id, 404); return $activity; }
-    private function eventForPresentation(Event $event): array { return ['id' => $event->id, 'title' => $event->title, 'event_timezone' => $event->event_timezone]; }
+    private function eventForPresentation(Event $event): array { return ['id' => $event->id, 'title' => $event->title, 'event_timezone' => $event->event_timezone, 'main_date' => $event->getRawOriginal('main_date') ? substr($event->getRawOriginal('main_date'), 0, 10) : null]; }
     private function activityForPresentation(EventActivity $activity, Event $event): array { $start = $activity->starts_at->setTimezone($event->event_timezone); $end = $activity->ends_at?->setTimezone($event->event_timezone); return ['id' => $activity->id, 'title' => $activity->title, 'activity_type' => $activity->activity_type, 'description' => $activity->description, 'date' => $start->format('F j, Y'), 'start_time' => $start->format('g:i A'), 'end_date' => $end?->format('F j, Y'), 'end_time' => $end?->format('g:i A'), 'venue' => $activity->venue, 'address' => $activity->address, 'location_url' => $activity->location_url, 'location_notes' => $activity->location_notes, 'display_order' => $activity->display_order, 'is_active' => $activity->is_active, 'created_at' => $activity->created_at?->setTimezone($event->event_timezone)->format('F j, Y \\a\\t g:i A'), 'updated_at' => $activity->updated_at?->setTimezone($event->event_timezone)->format('F j, Y \\a\\t g:i A')]; }
     private function activityForForm(EventActivity $activity, Event $event): array { $start = $activity->starts_at->setTimezone($event->event_timezone); $end = $activity->ends_at?->setTimezone($event->event_timezone); return ['id' => $activity->id, 'title' => $activity->title, 'activity_type' => $activity->activity_type, 'description' => $activity->description, 'start_date' => $start->format('Y-m-d'), 'start_time' => $start->format('H:i'), 'end_date' => $end?->format('Y-m-d'), 'end_time' => $end?->format('H:i'), 'venue' => $activity->venue, 'address' => $activity->address, 'location_url' => $activity->location_url, 'location_notes' => $activity->location_notes, 'display_order' => $activity->display_order]; }
 }

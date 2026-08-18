@@ -19,11 +19,103 @@ use Inertia\Response;
 
 class AdminController extends Controller
 {
-    public function customers(Request $request): Response { $search = $request->string('search')->trim()->toString(); $customers = Customer::query()->withCount(['users', 'events'])->when($search, fn ($query) => $query->where(fn ($query) => $query->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))->latest()->get(); return Inertia::render('Admin/Customers', ['customers' => $customers, 'filters' => ['search' => $search]]); }
+    public function customers(Request $request): Response
+    {
+        $search = $request->string('search')->trim()->toString();
+        $customers = Customer::query()
+            ->with(['users' => fn ($query) => $query->where('role', 'customer')->orderBy('customer_account_role')->orderBy('id'), 'events' => fn ($query) => $query->with(['package', 'payments'])->withCount('publications')])
+            ->withCount(['users' => fn ($query) => $query->where('role', 'customer'), 'events'])
+            ->when($search, fn ($query) => $query->where(fn ($query) => $query->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
+            ->latest()->get()
+            ->map(fn (Customer $customer) => $this->customerForList($customer))->values();
+
+        return Inertia::render('Admin/Customers', [
+            'customers' => $customers,
+            'packages' => EventPackage::query()->where('is_active', true)->capacityOrder()->get(['id','name','minimum_guests','maximum_guests','price']),
+            'filters' => ['search' => $search],
+        ]);
+    }
     public function storeCustomer(Request $r): RedirectResponse { Customer::create($r->validate(['name'=>'required|string|max:255','contact_name'=>'nullable|string|max:255','email'=>'nullable|email','phone'=>'nullable|string|max:50','is_active'=>'boolean'])); return back()->with('success','Customer created.'); }
     public function updateCustomer(Request $r, Customer $customer): RedirectResponse { $customer->update($r->validate(['name'=>'required|string|max:255','contact_name'=>'nullable|string|max:255','email'=>'nullable|email','phone'=>'nullable|string|max:50','is_active'=>'boolean'])); return back()->with('success','Customer updated.'); }
     public function users(Request $request): Response { $search = $request->string('search')->trim()->toString(); $users = User::with('customer')->where('role','customer')->when($search, fn ($query) => $query->where(fn ($query) => $query->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$search}%"))))->latest()->get(); return Inertia::render('Admin/Users', ['users'=>$users, 'customers'=>Customer::where('is_active',true)->get(), 'filters' => ['search' => $search]]); }
-    public function storeUser(Request $r): RedirectResponse { $data=$r->validate(['customer_id'=>'required|exists:customers,id','name'=>'required|string|max:255','email'=>'required|email|unique:users,email','password'=>'required|string|min:8']); User::create([...$data,'role'=>'customer','password'=>Hash::make($data['password'])]); return back()->with('success','Customer user created.'); }
+    public function storeUser(Request $r): RedirectResponse { $data=$r->validate(['customer_id'=>'required|exists:customers,id','name'=>'required|string|max:255','email'=>'required|email|unique:users,email','password'=>'required|string|min:8']); $this->ensureCustomerAccountSpace((int) $data['customer_id']); User::create([...$data,'role'=>'customer','customer_account_role'=>'secondary','password'=>Hash::make($data['password'])]); return back()->with('success','Customer user created.'); }
+
+    public function storeClient(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required','string','max:255'], 'phone' => ['nullable','string','max:50'], 'guest_capacity' => ['required','integer','min:1'],
+            'primary_name' => ['required','string','max:255'], 'primary_email' => ['required','email','unique:users,email'], 'primary_password' => ['required','string','min:8'],
+            'secondary_name' => ['nullable','string','max:255'], 'secondary_email' => ['nullable','email','unique:users,email'], 'secondary_password' => ['nullable','string','min:8'],
+        ]);
+        $package = $this->packageForCapacity((int) $data['guest_capacity']);
+        $secondary = filled($data['secondary_name'] ?? null) || filled($data['secondary_email'] ?? null) || filled($data['secondary_password'] ?? null);
+        if ($secondary && (! filled($data['secondary_name'] ?? null) || ! filled($data['secondary_email'] ?? null) || ! filled($data['secondary_password'] ?? null))) throw ValidationException::withMessages(['secondary_name' => 'Complete all second login fields or leave them all blank.']);
+
+        DB::transaction(function () use ($data, $secondary, $package): void {
+            // These legacy Customer fields remain populated without making Admin enter the same contact details twice.
+            $customer = Customer::create(['name'=>$data['name'],'contact_name'=>$data['primary_name'],'email'=>$data['primary_email'],'phone'=>$data['phone'] ?? null,'is_active'=>true]);
+            $event = $customer->events()->create(['event_package_id'=>$package->id, 'guest_capacity'=>$data['guest_capacity'], 'event_timezone'=>config('app.timezone'), 'status'=>'draft']);
+            $primary = User::create(['customer_id'=>$customer->id,'name'=>$data['primary_name'],'email'=>$data['primary_email'],'password'=>Hash::make($data['primary_password']),'role'=>'customer','customer_account_role'=>'primary']);
+            $event->members()->attach($primary->id, ['role'=>'owner']);
+            if ($secondary) { $second = User::create(['customer_id'=>$customer->id,'name'=>$data['secondary_name'],'email'=>$data['secondary_email'],'password'=>Hash::make($data['secondary_password']),'role'=>'customer','customer_account_role'=>'secondary']); $event->members()->attach($second->id, ['role'=>'editor']); }
+            return;
+        });
+        return to_route('admin.customers.index')->with('success', 'Client, login account, package, and Event setup shell created.');
+    }
+
+    public function showCustomer(Customer $customer): Response
+    {
+        $customer->load(['users' => fn ($query) => $query->where('role','customer')->orderBy('customer_account_role'), 'events.package', 'events.payments']);
+        return Inertia::render('Admin/ClientDetails', ['customer' => $customer, 'customerUsers' => $customer->users, 'events' => $customer->events->map(fn (Event $event) => ['id'=>$event->id,'title'=>$event->title,'invitation_status'=>$event->status === 'archived' ? 'Archived' : ($event->publications()->exists() ? 'Active' : 'Setup'),'guest_capacity'=>$event->effectiveGuestCapacity(),'package'=>$event->package?->only(['name','minimum_guests','maximum_guests','price']),'finance'=>['has_record'=>$event->payments->isNotEmpty(),'final_amount'=>(float) $event->payments->sum('final_amount'),'paid_amount'=>(float) $event->payments->sum('paid_amount'),'remaining_amount'=>$event->payments->sum(fn ($payment) => $payment->remainingAmount())]])->values(), 'canAddSecondLogin' => $customer->users->count() < 2]);
+    }
+
+    public function storeSecondLogin(Request $request, Customer $customer): RedirectResponse
+    {
+        $this->ensureCustomerAccountSpace($customer->id);
+        $data = $request->validate(['name'=>['required','string','max:255'],'email'=>['required','email','unique:users,email'],'password'=>['required','string','min:8']]);
+        $user = User::create([...$data,'customer_id'=>$customer->id,'role'=>'customer','customer_account_role'=>'secondary','password'=>Hash::make($data['password'])]);
+        $customer->events()->each(fn (Event $event) => $event->members()->syncWithoutDetaching([$user->id => ['role'=>'editor']]));
+        return back()->with('success','Second client login added.');
+    }
+
+    public function resetCustomerUserPassword(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($user->role === 'customer', 404);
+        $data = $request->validate(['password'=>['required','string','min:8']]);
+        $user->update(['password'=>Hash::make($data['password'])]);
+        return back()->with('success','Client password reset.');
+    }
+
+    private function ensureCustomerAccountSpace(int $customerId): void
+    {
+        if (User::query()->where('customer_id',$customerId)->where('role','customer')->count() >= 2) throw ValidationException::withMessages(['customer_id'=>'A Client can have at most two login accounts.']);
+    }
+
+    private function packageForCapacity(int $capacity): EventPackage
+    {
+        $matches = EventPackage::query()->where('is_active', true)->where('minimum_guests', '<=', $capacity)->where('maximum_guests', '>=', $capacity)->get();
+        if ($matches->isEmpty()) throw ValidationException::withMessages(['guest_capacity' => 'No active Package covers this guest capacity. Review the Package ranges.']);
+        if ($matches->count() > 1) throw ValidationException::withMessages(['guest_capacity' => 'More than one active Package covers this guest capacity. Resolve the overlapping Package ranges first.']);
+        return $matches->first();
+    }
+
+    private function customerForList(Customer $customer): array
+    {
+        $users = $customer->users;
+        $primary = $users->firstWhere('customer_account_role', 'primary') ?? $users->first();
+        $secondary = $users->firstWhere('customer_account_role', 'secondary') ?? $users->reject(fn (User $user) => $primary && $user->is($primary))->first();
+        $events = $customer->events;
+        $event = $events->count() === 1 ? $events->first() : null;
+        $payment = $event?->payments->first();
+
+        return [
+            'id' => $customer->id, 'name' => $customer->name,
+            'primary_login' => $primary ? ['name' => $primary->name, 'email' => $primary->email] : null,
+            'second_login' => $secondary ? ['name' => $secondary->name, 'email' => $secondary->email] : null,
+            'event_count' => $events->count(),
+            'event' => $event ? ['title' => $event->title, 'guest_capacity' => $event->effectiveGuestCapacity(), 'invitation_status' => $event->status === 'archived' ? 'Archived' : ($event->publications_count ? 'Active' : 'Setup'), 'payment_status' => match ($payment?->status) { 'paid' => 'Paid', 'partially_paid' => 'Partially Paid', default => 'Unpaid' }] : null,
+        ];
+    }
     public function packages(Request $request): Response { $search = $request->string('search')->trim()->toString(); $active = $request->string('active')->toString(); $packages = EventPackage::query()->when($search, fn ($query) => $query->where('name', 'like', "%{$search}%"))->when(in_array($active, ['active', 'inactive'], true), fn ($query) => $query->where('is_active', $active === 'active'))->capacityOrder()->get(); return Inertia::render('Admin/Packages', ['packages'=>$packages, 'filters' => ['search' => $search, 'active' => $active]]); }
     public function storePackage(Request $r): RedirectResponse { EventPackage::create($r->validate(['name'=>'required|string|max:255','minimum_guests'=>'required|integer|min:1','maximum_guests'=>'required|integer|gte:minimum_guests','price'=>'nullable|numeric|min:0','is_active'=>'boolean'])); return back()->with('success','Package created.'); }
     public function updatePackage(Request $r, EventPackage $package): RedirectResponse { $package->update($r->validate(['name'=>'required|string|max:255','minimum_guests'=>'required|integer|min:1','maximum_guests'=>'required|integer|gte:minimum_guests','price'=>'nullable|numeric|min:0','is_active'=>'boolean'])); return back()->with('success','Package updated.'); }

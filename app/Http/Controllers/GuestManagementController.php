@@ -28,10 +28,10 @@ class GuestManagementController extends Controller
             ->when($members === 'without', fn ($query) => $query->doesntHave('members'))
             ->orderBy('name')->get();
         $allParties = $event->invitationParties()->withCount('members')->get();
-        $capacity = $event->package?->maximum_guests;
+        $capacity = $event->effectiveGuestCapacity();
         $allocated = $event->allocatedGuestCapacity();
 
-        return Inertia::render('Events/Guests/Index', ['event' => $event->load('package'), 'parties' => $parties, 'summary' => ['package_capacity' => $capacity, 'allocated_capacity' => $allocated, 'remaining_capacity' => $capacity === null ? null : max($capacity - $allocated, 0), 'party_count' => $allParties->count(), 'member_count' => $allParties->sum('members_count')], 'filters' => ['search' => $search, 'active' => $active, 'members' => $members], 'canManage' => $request->user()->can('update', $event)]);
+        return Inertia::render('Events/Guests/Index', ['event' => $event->load('package'), 'parties' => $parties, 'summary' => ['guest_capacity' => $capacity, 'allocated_capacity' => $allocated, 'remaining_capacity' => $capacity === null ? null : max($capacity - $allocated, 0), 'party_count' => $allParties->count(), 'member_count' => $allParties->sum('members_count')], 'filters' => ['search' => $search, 'active' => $request->string('active')->toString(), 'members' => $members], 'canManage' => $request->user()->can('update', $event)]);
     }
 
     public function storeParty(Request $request, Event $event): RedirectResponse
@@ -135,8 +135,9 @@ class GuestManagementController extends Controller
 
     private function assertCapacity(Event $event, int $maximumPartySize, ?int $exceptPartyId = null): void
     {
-        if (! $event->package) return;
-        $remaining = $event->package->maximum_guests - $event->allocatedGuestCapacity($exceptPartyId);
+        $capacity = $event->effectiveGuestCapacity();
+        if ($capacity === null) return;
+        $remaining = $capacity - $event->allocatedGuestCapacity($exceptPartyId);
         if ($maximumPartySize > $remaining) throw ValidationException::withMessages(['maximum_party_size' => "This invitation would exceed the event's guest capacity. Only ".max($remaining, 0).' guest spots remain.']);
     }
 

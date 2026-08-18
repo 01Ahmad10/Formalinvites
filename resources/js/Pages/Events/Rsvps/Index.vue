@@ -7,13 +7,13 @@ import { reactive, ref } from 'vue';
 
 type Meal = { id: number; name: string; description: string | null; display_order: number; is_active: boolean };
 
-const props = defineProps<{ event: any; parties: any[]; summary: any; meals: Meal[]; filters: any; canManage: boolean }>();
+const props = defineProps<{ event: any; parties: any[]; summary: any; meals: Meal[]; filters: any; canManage: boolean; fromSetup: boolean }>();
 const filters = reactive({ ...props.filters });
-const mealForm = useForm({ name: '', description: '', display_order: 0 });
+const mealForm = useForm({ name: '', description: '', display_order: 0, from_setup: props.fromSetup });
 const editingMeal = ref<Meal | null>(null);
-const editMealForm = useForm({ name: '', description: '', display_order: 0 });
+const editMealForm = useForm({ name: '', description: '', display_order: 0, from_setup: props.fromSetup });
 
-const apply = () => router.get(route('events.rsvps.index', props.event.id), filters, { preserveState: true, replace: true });
+const apply = () => router.get(route('events.rsvps.index', props.event.id), { ...filters, from_setup: props.fromSetup ? 1 : undefined }, { preserveState: true, replace: true });
 const reset = () => { filters.search = ''; filters.status = ''; apply(); };
 const attendingCount = (party: any) => party.rsvp?.person_responses?.filter((person: any) => person.is_attending).length || 0;
 const adultCount = (party: any) => party.rsvp?.person_responses?.filter((person: any) => person.is_attending && person.member_type === 'adult').length || 0;
@@ -40,7 +40,7 @@ const updateMeal = () => {
         <template #header>
             <div class="flex justify-between">
                 <h2 class="text-xl font-semibold">RSVP responses</h2>
-                <Link :href="route('events.show', event.id)" class="rounded border px-3 py-2 text-sm">Back to Event</Link>
+                <Link :href="fromSetup ? route('events.setup', { event: event.id, step: 3 }) : route('events.show', event.id)" class="rounded border px-3 py-2 text-sm">{{ fromSetup ? 'Back to Invitation Setup' : 'Back to Event' }}</Link>
             </div>
         </template>
 
@@ -83,7 +83,7 @@ const updateMeal = () => {
                         <span>{{ meal.name }} <span class="text-sm text-gray-500">{{ meal.description }}</span></span>
                         <span class="flex items-center gap-3">
                             <button v-if="canManage" class="text-indigo-600" @click="startEditingMeal(meal)">Edit</button>
-                            <button v-if="canManage" class="text-indigo-600" @click="router.patch(route('events.meals.active', [event.id, meal.id]), { is_active: !meal.is_active })">{{ meal.is_active ? 'Deactivate' : 'Activate' }}</button>
+                            <button v-if="canManage" class="text-indigo-600" @click="router.patch(route('events.meals.active', [event.id, meal.id]), { is_active: !meal.is_active, from_setup: fromSetup })">{{ meal.is_active ? 'Deactivate' : 'Activate' }}</button>
                             <span v-else>{{ meal.is_active ? 'Active' : 'Inactive' }}</span>
                         </span>
                     </div>

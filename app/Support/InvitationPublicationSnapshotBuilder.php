@@ -24,6 +24,7 @@ class InvitationPublicationSnapshotBuilder
                 'second_host_name' => $event->second_host_name,
                 'description' => $event->description,
                 'main_date' => $this->date($event->getRawOriginal('main_date')),
+                'end_date' => $this->date($event->getRawOriginal('end_date')),
                 'start_time' => $this->time($event->start_time),
                 'end_time' => $this->time($event->end_time),
                 'event_timezone' => $timezone,

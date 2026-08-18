@@ -95,6 +95,15 @@ class EventActivityTest extends TestCase
         $this->assertDatabaseCount('event_activities', 1);
     }
 
+    public function test_activity_created_from_invitation_setup_returns_to_schedule_and_rsvp_step(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $event = $this->event();
+
+        $this->actingAs($admin)->post(route('events.activities.store', $event), [...$this->activityPayload(), 'from_setup' => true])
+            ->assertRedirect(route('events.setup', ['event' => $event, 'step' => 3]));
+    }
+
     public function test_beirut_activity_wall_clock_time_round_trips_through_storage_schedule_and_edit_form(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

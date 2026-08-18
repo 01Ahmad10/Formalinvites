@@ -155,6 +155,71 @@ class EventPublicationTest extends TestCase
         $this->assertDatabaseHas('events', ['id' => $event->id, 'template_id' => $template->id]);
     }
 
+    public function test_wizard_steps_are_freely_available_but_completion_comes_only_from_saved_event_data(): void
+    {
+        [$event, $owner] = $this->eventWithUsers(['title' => null, 'event_type' => null, 'host_name' => null, 'main_date' => null, 'start_time' => null, 'rsvp_deadline' => null, 'template_id' => null]);
+
+        foreach ([1, 2, 3, 4, 5] as $step) {
+            $this->actingAs($owner)->get(route('events.setup', ['event' => $event, 'step' => $step]))
+                ->assertInertia(fn (Assert $page) => $page
+                    ->component('Events/Setup')
+                    ->where('step', $step)
+                    ->where('steps.details', false)
+                    ->where('steps.location', false)
+                    ->where('steps.schedule', false)
+                    ->where('steps.design', false));
+        }
+
+        $event->update(['event_type' => 'wedding', 'title' => 'Saved Event', 'host_name' => 'Maya', 'main_date' => '2027-10-12', 'start_time' => '16:00', 'event_timezone' => 'America/New_York', 'venue' => null, 'address' => null]);
+
+        $this->actingAs($owner)->get(route('events.setup', ['event' => $event, 'step' => 5]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('steps.details', true)
+                ->where('steps.location', true)
+                ->where('steps.schedule', false));
+        $this->assertDatabaseCount('event_publications', 0);
+    }
+
+    public function test_customer_sees_only_active_customer_selectable_templates_and_cannot_craft_a_legacy_selection(): void
+    {
+        [$event, $owner] = $this->eventWithUsers(['template_id' => null]);
+        $romantic = $this->template('romantic-floral', InvitationTemplateSettings::defaults());
+        $editorial = $this->template('editorial-luxury', InvitationTemplateSettings::editorialLuxuryDefaults());
+        $cinematic = $this->template('modern-cinematic', InvitationTemplateSettings::modernCinematicDefaults());
+        Template::query()->where('component_key', 'romantic-floral')->where('id', '!=', $romantic->id)->firstOrFail()->update(['is_customer_selectable' => false]);
+        $romantic->update(['display_order' => 1]);
+        $editorial->update(['display_order' => 2]);
+        $cinematic->update(['display_order' => 3]);
+        $legacy = Template::create(['name' => 'Modern Minimal', 'slug' => 'modern-minimal-'.uniqid(), 'component_key' => 'modern-minimal', 'default_settings' => [], 'is_active' => true, 'is_customer_selectable' => false]);
+        Template::create(['name' => 'Elegant Classic', 'slug' => 'elegant-classic-'.uniqid(), 'component_key' => 'elegant-classic', 'default_settings' => [], 'is_active' => true, 'is_customer_selectable' => false]);
+        $inactive = Template::create(['name' => 'Inactive Romantic', 'slug' => 'inactive-romantic-'.uniqid(), 'component_key' => 'romantic-floral', 'default_settings' => [], 'is_active' => false, 'is_customer_selectable' => true]);
+
+        $this->actingAs($owner)->get(route('events.setup', ['event' => $event, 'step' => 4]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('templates.0.id', $romantic->id)
+                ->where('templates.1.id', $editorial->id)
+                ->where('templates.2.id', $cinematic->id)
+                ->has('templates', 3));
+
+        $this->actingAs($owner)->patch(route('events.setup.save', [$event, 'design']), ['template_id' => $legacy->id, 'settings' => []])
+            ->assertSessionHasErrors('template_id');
+        $this->assertDatabaseMissing('events', ['id' => $event->id, 'template_id' => $legacy->id]);
+        $this->assertNotNull($inactive);
+    }
+
+    public function test_customer_can_keep_an_existing_inactive_legacy_template_but_cannot_select_it_for_another_event(): void
+    {
+        [$event, $owner] = $this->eventWithUsers();
+        $legacy = Template::create(['name' => 'Legacy', 'slug' => 'legacy-'.uniqid(), 'component_key' => 'modern-minimal', 'default_settings' => [], 'is_active' => false, 'is_customer_selectable' => false]);
+        $event->update(['template_id' => $legacy->id]);
+        Template::query()->where('id', '!=', $legacy->id)->update(['is_customer_selectable' => false]);
+
+        $this->actingAs($owner)->get(route('events.setup', ['event' => $event, 'step' => 4]))
+            ->assertInertia(fn (Assert $page) => $page->where('templates.0.id', $legacy->id));
+        $this->actingAs($owner)->patch(route('events.setup.save', [$event, 'design']), ['template_id' => $legacy->id, 'settings' => []])
+            ->assertRedirect();
+    }
+
     public function test_customer_with_one_unpublished_event_is_sent_to_setup_but_multiple_events_are_not_ambiguous(): void
     {
         [$event, $owner] = $this->eventWithUsers();
@@ -194,6 +259,6 @@ class EventPublicationTest extends TestCase
 
     private function template(string $componentKey, array $settings): Template
     {
-        return Template::create(['name' => str($componentKey)->headline(), 'slug' => $componentKey.'-'.uniqid(), 'component_key' => $componentKey, 'default_settings' => $settings, 'is_active' => true]);
+        return Template::create(['name' => str($componentKey)->headline(), 'slug' => $componentKey.'-'.uniqid(), 'component_key' => $componentKey, 'default_settings' => $settings, 'is_active' => true, 'is_customer_selectable' => in_array($componentKey, ['romantic-floral', 'editorial-luxury', 'modern-cinematic'], true)]);
     }
 }

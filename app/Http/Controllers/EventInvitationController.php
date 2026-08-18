@@ -7,6 +7,8 @@ use App\Models\InvitationParty;
 use App\Models\Template;
 use App\Support\InvitationPresenter;
 use App\Support\InvitationTemplateSettings;
+use App\Support\EventPublicationService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -22,6 +24,7 @@ class EventInvitationController extends Controller
 
         $templates = Template::query()
             ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $event->template_id))
+            ->when(! $request->user()->isAdmin(), fn ($query) => $query->where(fn ($query) => $query->where('is_customer_selectable', true)->orWhere('id', $event->template_id)))
             ->orderBy('display_order')->orderBy('name')->get()
             ->filter(fn (Template $template) => $template->id === $event->template_id || ! $template->supported_event_types || in_array($event->event_type, $template->supported_event_types, true))
             ->map(fn (Template $template) => $this->templateForSelection($template))->values();
@@ -38,11 +41,15 @@ class EventInvitationController extends Controller
         ]);
     }
 
-    public function update(Request $request, Event $event): RedirectResponse
+    public function update(Request $request, Event $event, EventPublicationService $publications): RedirectResponse
     {
         $this->manage($request, $event);
         $data = $request->validate(['template_id' => ['nullable', 'integer', 'exists:templates,id'], 'settings' => ['nullable', 'array']]);
         $template = isset($data['template_id']) ? Template::findOrFail($data['template_id']) : null;
+
+        if ($template && ! $request->user()->isAdmin() && ! $template->is_customer_selectable && $template->id !== $event->template_id) {
+            throw ValidationException::withMessages(['template_id' => 'This invitation design is not available for customer selection.']);
+        }
 
         if ($template && ! $template->is_active && $template->id !== $event->template_id) {
             throw ValidationException::withMessages(['template_id' => 'Inactive templates cannot be selected for an Event.']);
@@ -56,10 +63,12 @@ class EventInvitationController extends Controller
         }
 
         $settings = InvitationTemplateSettings::validateEventSettings($data['settings'] ?? [], $template?->default_settings);
-        $event->update(['template_id' => $template?->id]);
-        if ($request->has('settings')) {
-            $event->templateSetting()->updateOrCreate([], ['settings' => $settings]);
-        }
+        DB::transaction(function () use ($event, $template, $request, $settings, $publications): void {
+            $locked = Event::query()->lockForUpdate()->findOrFail($event->id);
+            $locked->update(['template_id' => $template?->id]);
+            if ($request->has('settings')) $locked->templateSetting()->updateOrCreate([], ['settings' => $settings]);
+            $publications->publishIfActiveLocked($locked, $request->user());
+        });
 
         return back()->with('success', 'Invitation template settings saved.');
     }

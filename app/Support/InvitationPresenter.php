@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventPublication;
 use App\Models\InvitationParty;
 use Carbon\CarbonImmutable;
+use App\Support\EventTiming;
 
 class InvitationPresenter
 {
@@ -26,6 +27,7 @@ class InvitationPresenter
                 'host_name' => $event->host_name,
                 'second_host_name' => $event->second_host_name,
                 'main_date' => $event->getRawOriginal('main_date') ? CarbonImmutable::createFromFormat('!Y-m-d', substr($event->getRawOriginal('main_date'), 0, 10), $timezone)->format('l, F j, Y') : null,
+                'end_date' => $event->getRawOriginal('end_date') ? CarbonImmutable::createFromFormat('!Y-m-d', substr($event->getRawOriginal('end_date'), 0, 10), $timezone)->format('l, F j, Y') : null,
                 'start_time' => $this->formatEventTime($event->start_time, $timezone),
                 'end_time' => $this->formatEventTime($event->end_time, $timezone),
                 'timezone' => $timezone,
@@ -37,7 +39,7 @@ class InvitationPresenter
                 'transportation_information' => $event->transportation_information,
                 'accommodation_information' => $event->accommodation_information,
                 'guest_information' => $event->guest_information,
-                'rsvp_deadline' => $event->rsvpDeadlineAt()?->format('F j, Y \a\t g:i A')." ({$timezone})",
+                'rsvp_deadline' => $event->rsvpDeadlineAt()?->format('F j, Y'),
                 'rsvp_open' => ! $event->isRsvpClosed(),
                 'activities' => $event->activities->map(function ($activity) use ($timezone) {
                     $start = $activity->starts_at->setTimezone($timezone);
@@ -66,6 +68,7 @@ class InvitationPresenter
                 'host_name' => $event['host_name'],
                 'second_host_name' => $event['second_host_name'],
                 'main_date' => $this->date($event['main_date'], $timezone),
+                'end_date' => $this->date($event['end_date'] ?? null, $timezone),
                 'start_time' => $this->formatEventTime($event['start_time'], $timezone),
                 'end_time' => $this->formatEventTime($event['end_time'], $timezone),
                 'timezone' => $timezone,
@@ -107,7 +110,7 @@ class InvitationPresenter
 
     private function deadline(?string $date, string $timezone): ?string
     {
-        return $date ? CarbonImmutable::createFromFormat('!Y-m-d', substr($date, 0, 10), $timezone)->endOfDay()->format('F j, Y \\a\\t g:i A')." ({$timezone})" : null;
+        return $date ? CarbonImmutable::createFromFormat('!Y-m-d', substr($date, 0, 10), $timezone)->format('F j, Y') : null;
     }
 
     private function closed(?string $date, string $timezone): bool

@@ -41,7 +41,7 @@ const showEventTitle = computed(() => props.invitation.event.title?.trim().toLoc
             </div>
             <div v-if="invitation.event.main_date || invitation.event.start_time" class="cinematic-hero-date">
                 <span>{{ invitation.event.main_date || 'Date to be confirmed' }}</span>
-                <span v-if="invitation.event.start_time">{{ invitation.event.start_time }}<template v-if="invitation.event.end_time"> – {{ invitation.event.end_time }}</template></span>
+                <span v-if="invitation.event.start_time">{{ invitation.event.start_time }}<template v-if="invitation.event.end_time"> – <template v-if="invitation.event.end_date && invitation.event.end_date !== invitation.event.main_date">{{ invitation.event.end_date }}, </template>{{ invitation.event.end_time }}</template></span>
             </div>
         </header>
 
@@ -49,7 +49,7 @@ const showEventTitle = computed(() => props.invitation.event.title?.trim().toLoc
             <section v-if="invitation.event.main_date" class="reveal-on-scroll cinematic-date-scene">
                 <p class="cinematic-section-label">02 / THE MOMENT</p>
                 <p class="cinematic-date">{{ invitation.event.main_date }}</p>
-                <p class="cinematic-time">{{ invitation.event.start_time || 'Time to be confirmed' }}<template v-if="invitation.event.end_time"> – {{ invitation.event.end_time }}</template><span v-if="invitation.event.timezone"> · {{ invitation.event.timezone }}</span></p>
+                <p class="cinematic-time">{{ invitation.event.start_time || 'Time to be confirmed' }}<template v-if="invitation.event.end_time"> – <template v-if="invitation.event.end_date && invitation.event.end_date !== invitation.event.main_date">{{ invitation.event.end_date }}, </template>{{ invitation.event.end_time }}</template><span v-if="invitation.event.timezone"> · {{ invitation.event.timezone }}</span></p>
             </section>
 
             <section v-if="invitation.event.activities?.length" class="reveal-on-scroll cinematic-section">

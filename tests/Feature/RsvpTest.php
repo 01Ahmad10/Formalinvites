@@ -44,6 +44,22 @@ class RsvpTest extends TestCase
         $this->get(route('public.rsvp.show', $party->rsvp_token))->assertOk();
     }
 
+    public function test_meal_management_started_from_setup_keeps_the_wizard_context(): void
+    {
+        $owner = User::factory()->create(['role' => 'customer']);
+        $event = $this->event();
+        $owner->update(['customer_id' => $event->customer_id]);
+        $event->members()->attach($owner, ['role' => 'owner']);
+
+        $this->actingAs($owner)->get(route('events.rsvps.index', ['event' => $event, 'from_setup' => 1]))
+            ->assertInertia(fn (Assert $page) => $page->where('fromSetup', true));
+        $this->actingAs($owner)->post(route('events.meals.store', $event), ['name' => 'Chicken', 'from_setup' => true])
+            ->assertRedirect(route('events.setup', ['event' => $event, 'step' => 3]));
+
+        $this->actingAs($owner)->get(route('events.meals.index', ['event' => $event, 'from_setup' => 1]))
+            ->assertInertia(fn (Assert $page) => $page->component('Events/Meals/Index')->where('fromSetup', true)->missing('parties')->missing('summary'));
+    }
+
     public function test_party_can_submit_attending_and_update_before_deadline_with_meals_and_notes(): void
     {
         $event = $this->event();
@@ -89,7 +105,7 @@ class RsvpTest extends TestCase
         $rsvp->personResponses()->create(['first_name' => 'Nadia', 'member_type' => 'adult', 'is_attending' => true, 'event_meal_option_id' => $meal->id, 'dietary_note' => 'No dairy']);
         $this->publish($event);
         $this->get(route('public.rsvp.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page
-            ->component('PublicRsvp')->where('rsvp.status', 'attending')->where('rsvp.guest_message', 'See you soon')->where('rsvp.submitted_at', 'August 11, 2026 at 10:32 AM')->where('rsvp.last_updated_at', 'August 11, 2026 at 10:32 AM')->where('rsvp.person_responses.0.meal_option.name', 'Fish')->missing('rsvp.id')->missing('rsvp.created_at')->where('party.name', 'Party')->where('party.event.event_type', 'Wedding')->where('party.event.main_date', 'Saturday, August 22, 2026')->where('party.event.start_time', '6:30 PM')->where('party.event.end_time', '11:00 PM')->where('party.event.venue', 'Cedar Hall')->where('party.event.address', '1 Cedar Street')->where('party.event.location_url', 'https://maps.example.test/cedar')->where('party.event.rsvp_deadline', 'August 20, 2026 at 11:59 PM (UTC)')->missing('party.event.customer_id')->missing('party.event.id')->where('closed', false));
+            ->component('PublicRsvp')->where('rsvp.status', 'attending')->where('rsvp.guest_message', 'See you soon')->where('rsvp.submitted_at', 'August 11, 2026 at 10:32 AM')->where('rsvp.last_updated_at', 'August 11, 2026 at 10:32 AM')->where('rsvp.person_responses.0.meal_option.name', 'Fish')->missing('rsvp.id')->missing('rsvp.created_at')->where('party.name', 'Party')->where('party.event.event_type', 'Wedding')->where('party.event.main_date', 'Saturday, August 22, 2026')->where('party.event.start_time', '6:30 PM')->where('party.event.end_time', '11:00 PM')->where('party.event.venue', 'Cedar Hall')->where('party.event.address', '1 Cedar Street')->where('party.event.location_url', 'https://maps.example.test/cedar')->where('party.event.rsvp_deadline', 'August 20, 2026')->missing('party.event.customer_id')->missing('party.event.id')->where('closed', false));
         $event->update(['rsvp_deadline' => now()->subDay()->toDateString()]);
         $this->publish($event);
         $this->get(route('public.rsvp.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page->component('PublicRsvp')->where('rsvp.status', 'attending')->where('closed', true));

@@ -14,8 +14,8 @@ class Event extends Model
     use HasFactory;
     public const TYPES = ['wedding', 'engagement', 'bridal_shower', 'birthday', 'graduation', 'baptism', 'communion'];
     public const STATUSES = ['draft', 'submitted', 'under_review', 'changes_requested', 'approved', 'published', 'archived'];
-    protected $fillable = ['customer_id', 'event_package_id', 'template_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'event_timezone', 'dress_code', 'parking_information', 'transportation_information', 'accommodation_information', 'guest_information', 'status', 'submitted_snapshot_hash', 'submitted_at', 'approved_snapshot_hash', 'approved_at', 'approved_by', 'review_note'];
-    protected function casts(): array { return ['main_date' => 'date', 'rsvp_deadline' => 'date', 'submitted_at' => 'immutable_datetime', 'approved_at' => 'immutable_datetime']; }
+    protected $fillable = ['customer_id', 'event_package_id', 'guest_capacity', 'template_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'end_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'event_timezone', 'dress_code', 'parking_information', 'transportation_information', 'accommodation_information', 'guest_information', 'status', 'submitted_snapshot_hash', 'submitted_at', 'approved_snapshot_hash', 'approved_at', 'approved_by', 'review_note'];
+    protected function casts(): array { return ['guest_capacity' => 'integer', 'main_date' => 'date', 'end_date' => 'date', 'rsvp_deadline' => 'date', 'submitted_at' => 'immutable_datetime', 'approved_at' => 'immutable_datetime']; }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function package(): BelongsTo { return $this->belongsTo(EventPackage::class, 'event_package_id'); }
     public function template(): BelongsTo { return $this->belongsTo(Template::class); }
@@ -56,4 +56,7 @@ class Event extends Model
     {
         return (int) $this->invitationParties()->where('is_active', true)->when($exceptPartyId, fn ($query) => $query->where('id', '!=', $exceptPartyId))->sum('maximum_party_size');
     }
+
+    /** Exact purchased capacity takes precedence; legacy Events use their Package maximum. */
+    public function effectiveGuestCapacity(): ?int { return $this->guest_capacity ?? $this->package?->maximum_guests; }
 }

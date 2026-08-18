@@ -23,7 +23,7 @@ class PublicInvitationTest extends TestCase
     public function test_a_public_invitation_uses_only_its_own_secure_token_and_safe_data(): void
     {
         [$event, $template] = $this->eventWithRomanticTemplate();
-        $event->update(['main_date' => '2026-08-12', 'start_time' => '16:00', 'end_time' => '17:00', 'event_timezone' => 'Asia/Beirut', 'venue' => 'Rose Garden']);
+        $event->update(['main_date' => '2026-08-12', 'start_time' => '16:00', 'end_time' => '17:00', 'event_timezone' => 'Asia/Beirut', 'venue' => 'Rose Garden', 'rsvp_deadline' => '2099-08-19']);
         $event->templateSetting()->create(['settings' => ['palette_key' => 'burgundy', 'font_pair_key' => 'classic']]);
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Williams Family', 'maximum_party_size' => 2]);
         $party->members()->create(['first_name' => 'Michael', 'last_name' => 'Williams', 'member_type' => 'adult']);
@@ -39,6 +39,7 @@ class PublicInvitationTest extends TestCase
             ->where('invitation.settings.primary_color', '#7C2438')
             ->where('invitation.settings.font_pair_key', 'classic')
             ->where('invitation.event.start_time', '4:00 PM')
+            ->where('invitation.event.rsvp_deadline', 'August 19, 2099')
             ->where('invitation.party_name', 'Williams Family')
             ->where('party.name', 'Williams Family')
             ->where('party.members.0.first_name', 'Michael')
@@ -74,7 +75,7 @@ class PublicInvitationTest extends TestCase
         $customer = Customer::create(['name' => 'Editorial Customer']);
         $package = EventPackage::create(['name' => 'Editorial Package', 'minimum_guests' => 1, 'maximum_guests' => 50, 'price' => 25, 'is_active' => true]);
         $template = Template::create(['name' => 'Editorial Luxury', 'slug' => 'editorial-'.uniqid(), 'component_key' => 'editorial-luxury', 'default_settings' => InvitationTemplateSettings::editorialLuxuryDefaults(), 'is_active' => true]);
-        $event = Event::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'template_id' => $template->id, 'title' => 'The Edit', 'event_type' => 'wedding', 'host_name' => 'Avery', 'second_host_name' => 'Morgan', 'event_timezone' => 'America/New_York', 'main_date' => '2026-09-12', 'status' => 'draft', 'rsvp_deadline' => now()->addWeek()->toDateString(), 'venue' => 'The Gallery', 'guest_information' => 'Arrive fifteen minutes early.']);
+        $event = Event::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'template_id' => $template->id, 'title' => 'The Edit', 'event_type' => 'wedding', 'host_name' => 'Avery', 'second_host_name' => 'Morgan', 'event_timezone' => 'America/New_York', 'main_date' => '2026-09-12', 'status' => 'draft', 'rsvp_deadline' => '2099-08-19', 'venue' => 'The Gallery', 'guest_information' => 'Arrive fifteen minutes early.']);
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'The Lee Family', 'maximum_party_size' => 1]);
         $event->activities()->create(['title' => 'Private Ceremony', 'activity_type' => 'ceremony', 'starts_at' => '2026-09-12 19:00:00+00', 'is_active' => true]);
         $event->activities()->create(['title' => 'Internal planning', 'activity_type' => 'other', 'starts_at' => '2026-09-12 20:00:00+00', 'is_active' => false]);
@@ -86,6 +87,7 @@ class PublicInvitationTest extends TestCase
             ->where('invitation.party_name', 'The Lee Family')
             ->where('invitation.settings.palette_key', 'champagne_noir')
             ->where('invitation.settings.font_pair_key', 'editorial')
+            ->where('invitation.event.rsvp_deadline', 'August 19, 2099')
             ->has('invitation.event.activities', 1)
             ->missing('invitation.event.customer_id')
             ->missing('invitation.event.payment')
@@ -108,7 +110,7 @@ class PublicInvitationTest extends TestCase
         $customer = Customer::create(['name' => 'Cinematic Customer']);
         $package = EventPackage::create(['name' => 'Cinematic Package', 'minimum_guests' => 1, 'maximum_guests' => 50, 'price' => 25, 'is_active' => true]);
         $template = Template::create(['name' => 'Modern Cinematic', 'slug' => 'cinematic-'.uniqid(), 'component_key' => 'modern-cinematic', 'default_settings' => InvitationTemplateSettings::modernCinematicDefaults(), 'is_active' => true]);
-        $event = Event::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'template_id' => $template->id, 'title' => 'An Evening in Motion', 'event_type' => 'engagement', 'host_name' => 'Maya', 'second_host_name' => 'Elias', 'event_timezone' => 'America/New_York', 'main_date' => '2026-09-12', 'start_time' => '16:00', 'end_time' => '17:00', 'status' => 'draft', 'rsvp_deadline' => now()->addWeek()->toDateString(), 'venue' => 'The Observatory']);
+        $event = Event::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'template_id' => $template->id, 'title' => 'An Evening in Motion', 'event_type' => 'engagement', 'host_name' => 'Maya', 'second_host_name' => 'Elias', 'event_timezone' => 'America/New_York', 'main_date' => '2026-09-12', 'start_time' => '16:00', 'end_time' => '17:00', 'status' => 'draft', 'rsvp_deadline' => '2099-08-19', 'venue' => 'The Observatory']);
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'The Smith Family', 'maximum_party_size' => 1]);
         $event->activities()->create(['title' => 'Ceremony', 'activity_type' => 'ceremony', 'starts_at' => '2026-09-12 20:00:00+00', 'is_active' => true]);
         $event->activities()->create(['title' => 'Internal planning', 'activity_type' => 'other', 'starts_at' => '2026-09-12 21:00:00+00', 'is_active' => false]);
@@ -121,6 +123,7 @@ class PublicInvitationTest extends TestCase
             ->where('invitation.settings.font_pair_key', 'cinematic_serif')
             ->where('invitation.party_name', 'The Smith Family')
             ->where('invitation.event.start_time', '4:00 PM')
+            ->where('invitation.event.rsvp_deadline', 'August 19, 2099')
             ->has('invitation.event.activities', 1)
             ->where('invitation.event.activities.0.title', 'Ceremony')
             ->where('invitation.experience.intro_video', null)

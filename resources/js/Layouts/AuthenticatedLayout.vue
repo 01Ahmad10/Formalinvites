@@ -42,8 +42,7 @@ const showingNavigationDropdown = ref(false);
                                     Dashboard
                                 </NavLink>
                                 <NavLink :href="route('events.index')" :active="route().current('events.*')">Events</NavLink>
-                                <NavLink v-if="$page.props.auth.user.role === 'admin'" :href="route('admin.customers.index')" :active="route().current('admin.customers.*')">Customers</NavLink>
-                                <NavLink v-if="$page.props.auth.user.role === 'admin'" :href="route('admin.users.index')" :active="route().current('admin.users.*')">Customer users</NavLink>
+                                <NavLink v-if="$page.props.auth.user.role === 'admin'" :href="route('admin.customers.index')" :active="route().current('admin.customers.*') || route().current('admin.clients.*')">Clients</NavLink>
                                 <NavLink v-if="$page.props.auth.user.role === 'admin'" :href="route('admin.packages.index')" :active="route().current('admin.packages.*')">Packages</NavLink>
                                 <NavLink v-if="$page.props.auth.user.role === 'admin'" :href="route('admin.payments.index')" :active="route().current('admin.payments.*')">Payments</NavLink>
                                 <NavLink v-if="$page.props.auth.user.role === 'admin'" :href="route('admin.coupons.index')" :active="route().current('admin.coupons.*')">Coupons</NavLink>

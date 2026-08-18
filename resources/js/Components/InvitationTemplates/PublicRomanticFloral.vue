@@ -19,7 +19,7 @@ defineProps<{ invitation: any }>();
             <section v-if="invitation.event.main_date" class="reveal-on-scroll romantic-date-section">
                 <p class="romantic-eyebrow">Save the date</p>
                 <p class="romantic-date">{{ invitation.event.main_date }}</p>
-                <p v-if="invitation.event.start_time || invitation.event.end_time" class="romantic-time">{{ invitation.event.start_time || 'Time to be confirmed' }}<span v-if="invitation.event.end_time"> – {{ invitation.event.end_time }}</span></p>
+                <p v-if="invitation.event.start_time || invitation.event.end_time" class="romantic-time">{{ invitation.event.start_time || 'Time to be confirmed' }}<span v-if="invitation.event.end_time"> – <span v-if="invitation.event.end_date && invitation.event.end_date !== invitation.event.main_date">{{ invitation.event.end_date }}, </span>{{ invitation.event.end_time }}</span></p>
                 <p class="romantic-timezone">{{ invitation.event.timezone }}</p>
             </section>
 

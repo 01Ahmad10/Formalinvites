@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('events/{event}/guests/{party}/members/{member}', [GuestManagementController::class, 'destroyMember'])->name('events.guests.members.destroy');
     Route::get('events/{event}/rsvps', [RsvpController::class, 'index'])->name('events.rsvps.index');
     Route::get('events/{event}/rsvps/{party}', [RsvpController::class, 'show'])->name('events.rsvps.show');
+    Route::get('events/{event}/meals', [RsvpController::class, 'meals'])->name('events.meals.index');
     Route::post('events/{event}/meals', [RsvpController::class, 'storeMeal'])->name('events.meals.store');
     Route::put('events/{event}/meals/{meal}', [RsvpController::class, 'updateMeal'])->name('events.meals.update');
     Route::patch('events/{event}/meals/{meal}/active', [RsvpController::class, 'setMealActive'])->name('events.meals.active');
@@ -67,7 +68,11 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('customers', [AdminController::class, 'customers'])->name('customers.index');
     Route::post('customers', [AdminController::class, 'storeCustomer'])->name('customers.store');
+    Route::post('clients', [AdminController::class, 'storeClient'])->name('clients.store');
+    Route::get('customers/{customer}', [AdminController::class, 'showCustomer'])->name('customers.show');
     Route::put('customers/{customer}', [AdminController::class, 'updateCustomer'])->name('customers.update');
+    Route::post('customers/{customer}/second-login', [AdminController::class, 'storeSecondLogin'])->name('customers.second-login.store');
+    Route::put('customer-users/{user}/password', [AdminController::class, 'resetCustomerUserPassword'])->name('customer-users.password.update');
     Route::get('users', [AdminController::class, 'users'])->name('users.index');
     Route::post('users', [AdminController::class, 'storeUser'])->name('users.store');
     Route::get('packages', [AdminController::class, 'packages'])->name('packages.index');

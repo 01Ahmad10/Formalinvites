@@ -41,6 +41,19 @@ class GuestManagementTest extends TestCase
         $this->assertDatabaseMissing('invitation_parties', ['event_id' => $event->id, 'name' => 'Too Large']);
     }
 
+    public function test_exact_event_capacity_limits_parties_even_when_pricing_package_has_more_capacity(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Exact Capacity']);
+        $package = EventPackage::create(['name' => '201–250', 'minimum_guests' => 201, 'maximum_guests' => 250, 'price' => 130, 'is_active' => true]);
+        $event = Event::create(['customer_id'=>$customer->id,'event_package_id'=>$package->id,'guest_capacity'=>220,'title'=>'Capacity Event','event_type'=>'wedding','host_name'=>'Host']);
+        InvitationParty::create(['event_id'=>$event->id,'name'=>'Allocated','maximum_party_size'=>220]);
+
+        $this->assertSame(220, $event->effectiveGuestCapacity());
+        $this->actingAs($admin)->get(route('events.guests.index', $event))->assertInertia(fn (Assert $page) => $page->where('summary.guest_capacity', 220)->where('summary.remaining_capacity', 0));
+        $this->actingAs($admin)->post(route('events.guests.store', $event), ['name'=>'Too many','maximum_party_size'=>1])->assertSessionHasErrors('maximum_party_size');
+    }
+
     public function test_editing_a_party_excludes_its_current_capacity_but_still_prevents_overflow(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -153,6 +166,17 @@ class GuestManagementTest extends TestCase
         InvitationParty::create(['event_id' => $event->id, 'name' => 'Family', 'maximum_party_size' => 6]);
 
         $this->actingAs($admin)->put(route('events.update', $event), ['customer_id' => $customer->id, 'event_package_id' => $small->id, 'title' => $event->title, 'event_type' => $event->event_type, 'host_name' => $event->host_name, 'status' => $event->status])->assertSessionHasErrors('event_package_id');
+    }
+
+    public function test_admin_cannot_assign_a_package_that_does_not_contain_exact_guest_capacity(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $customer = Customer::create(['name' => 'Customer']);
+        $current = EventPackage::create(['name'=>'201–250','minimum_guests'=>201,'maximum_guests'=>250,'price'=>130,'is_active'=>true]);
+        $lower = EventPackage::create(['name'=>'151–200','minimum_guests'=>151,'maximum_guests'=>200,'price'=>110,'is_active'=>true]);
+        $event = Event::create(['customer_id'=>$customer->id,'event_package_id'=>$current->id,'guest_capacity'=>220,'title'=>'Capacity Event','event_type'=>'wedding','host_name'=>'Host','status'=>'draft']);
+
+        $this->actingAs($admin)->put(route('events.update', $event), ['customer_id'=>$customer->id,'event_package_id'=>$lower->id,'guest_capacity'=>220,'title'=>$event->title,'event_type'=>$event->event_type,'host_name'=>$event->host_name,'status'=>$event->status])->assertSessionHasErrors('guest_capacity');
     }
 
     public function test_admin_can_edit_an_invitation_party(): void

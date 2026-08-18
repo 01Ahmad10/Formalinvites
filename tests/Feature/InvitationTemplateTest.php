@@ -335,6 +335,6 @@ class InvitationTemplateTest extends TestCase
 
     private function templatePayload(): array
     {
-        return ['name' => 'Elegant Classic', 'slug' => 'elegant-classic', 'description' => 'Safe template', 'category' => 'formal', 'component_key' => 'elegant-classic', 'supported_event_types' => ['wedding'], 'default_settings' => InvitationTemplateSettings::defaults(), 'is_active' => true, 'display_order' => 1];
+        return ['name' => 'Elegant Classic', 'slug' => 'elegant-classic', 'description' => 'Safe template', 'category' => 'formal', 'component_key' => 'elegant-classic', 'supported_event_types' => ['wedding'], 'default_settings' => InvitationTemplateSettings::defaults(), 'is_active' => true, 'is_customer_selectable' => true, 'display_order' => 1];
     }
 }

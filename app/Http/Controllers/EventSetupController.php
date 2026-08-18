@@ -7,11 +7,14 @@ use App\Models\Template;
 use App\Support\InvitationPresenter;
 use App\Support\InvitationPublicationSnapshotBuilder;
 use App\Support\InvitationTemplateSettings;
+use App\Support\EventPublicationService;
+use App\Support\EventTiming;
 use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -28,7 +31,7 @@ class EventSetupController extends Controller
         return Inertia::render('Events/Setup', [
             'event' => $event,
             'step' => $step,
-            'templates' => $this->templates($event),
+            'templates' => $this->templates($event, $request->user()),
             'overrides' => $event->templateSetting?->settings ?? [],
             'resolvedSettings' => InvitationTemplateSettings::resolve($event->template?->default_settings, $event->templateSetting?->settings),
             'activities' => $event->activities()->orderBy('display_order')->orderBy('starts_at')->get()->map(fn ($activity) => [
@@ -45,21 +48,34 @@ class EventSetupController extends Controller
                 'archived' => $event->status === 'archived',
                 'can_manage' => $request->user()->can('update', $event),
             ],
+            'steps' => [
+                'details' => filled($event->event_type) && filled($event->title) && filled($event->host_name),
+                'location' => $event->main_date !== null && filled($event->start_time) && in_array($event->event_timezone, DateTimeZone::listIdentifiers(), true),
+                'schedule' => $event->rsvp_deadline !== null || $event->activities()->exists() || $event->mealOptions()->exists(),
+                'design' => $event->template !== null,
+            ],
             'timezones' => DateTimeZone::listIdentifiers(),
         ]);
     }
 
-    public function save(Request $request, Event $event, string $step): RedirectResponse
+    public function save(Request $request, Event $event, string $step, EventPublicationService $publications): RedirectResponse
     {
         $this->manage($request, $event);
-
-        match ($step) {
-            'details' => $event->update($this->details($request)),
-            'location' => $event->update($this->location($request)),
-            'rsvp' => $event->update($this->rsvp($request, $event)),
-            'design' => $this->design($request, $event),
+        $data = match ($step) {
+            'details' => $this->details($request),
+            'location' => $this->location($request),
+            'rsvp' => $this->rsvp($request, $event),
+            'design' => null,
             default => abort(404),
         };
+
+        DB::transaction(function () use ($event, $step, $data, $request, $publications): void {
+            $locked = Event::query()->lockForUpdate()->findOrFail($event->id);
+            abort_if($locked->status === 'archived', 422, 'Archived Events cannot be changed.');
+            if ($step === 'design') $this->design($request, $locked);
+            else $locked->update($data);
+            $publications->publishIfActiveLocked($locked, $request->user());
+        });
 
         $next = ['details' => 2, 'location' => 3, 'rsvp' => 4, 'design' => 5][$step];
 
@@ -94,11 +110,7 @@ class EventSetupController extends Controller
             'guest_information' => ['nullable', 'string'],
         ]);
 
-        if (! empty($data['start_time']) && ! empty($data['end_time']) && $data['end_time'] <= $data['start_time']) {
-            throw ValidationException::withMessages(['end_time' => 'End time must be after start time.']);
-        }
-
-        return $data;
+        return EventTiming::deriveEndDate($data, $data['event_timezone']);
     }
 
     private function rsvp(Request $request, Event $event): array
@@ -116,6 +128,10 @@ class EventSetupController extends Controller
         $data = $request->validate(['template_id' => ['required', 'integer', 'exists:templates,id'], 'settings' => ['nullable', 'array']]);
         $template = Template::findOrFail($data['template_id']);
 
+        if (! $request->user()->isAdmin() && ! $template->is_customer_selectable && $template->id !== $event->template_id) {
+            throw ValidationException::withMessages(['template_id' => 'This invitation design is not available for customer selection.']);
+        }
+
         if (! $template->is_active && $template->id !== $event->template_id) {
             throw ValidationException::withMessages(['template_id' => 'Inactive templates cannot be selected for an Event.']);
         }
@@ -128,10 +144,11 @@ class EventSetupController extends Controller
         $event->templateSetting()->updateOrCreate([], ['settings' => $settings]);
     }
 
-    private function templates(Event $event): array
+    private function templates(Event $event, $user): array
     {
         return Template::query()
             ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $event->template_id))
+            ->when(! $user->isAdmin(), fn ($query) => $query->where(fn ($query) => $query->where('is_customer_selectable', true)->orWhere('id', $event->template_id)))
             ->orderBy('display_order')->orderBy('name')->get()
             ->filter(fn (Template $template) => $template->id === $event->template_id || ! $template->supported_event_types || in_array($event->event_type, $template->supported_event_types, true))
             ->map(fn (Template $template) => ['id' => $template->id, 'name' => $template->name, 'description' => $template->description, 'component_key' => $template->component_key, 'is_active' => $template->is_active, ...InvitationTemplateSettings::selectionOptions($template->default_settings)])

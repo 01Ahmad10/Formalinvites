@@ -110,7 +110,7 @@ class PublicRsvpPayload
     private function snapshot(InvitationParty $party, ?EventPublication $publication): array { return $publication?->snapshot ?? app(InvitationPublicationSnapshotBuilder::class)->build($party->event); }
     private function date(?string $date, string $timezone): ?string { return $date ? CarbonImmutable::createFromFormat('!Y-m-d', substr($date, 0, 10), $timezone)->format('l, F j, Y') : null; }
     private function time(?string $time): ?string { return $time ? CarbonImmutable::createFromFormat('!H:i:s', strlen($time) === 5 ? "{$time}:00" : $time)->format('g:i A') : null; }
-    private function deadline(?string $date, string $timezone): ?string { return $date ? CarbonImmutable::createFromFormat('!Y-m-d', substr($date, 0, 10), $timezone)->endOfDay()->format('F j, Y \\a\\t g:i A')." ({$timezone})" : null; }
+    private function deadline(?string $date, string $timezone): ?string { return $date ? CarbonImmutable::createFromFormat('!Y-m-d', substr($date, 0, 10), $timezone)->format('F j, Y') : null; }
     private function dateTime(?\DateTimeInterface $dateTime): ?string { return $dateTime ? CarbonImmutable::instance($dateTime)->setTimezone(config('app.timezone'))->format('F j, Y \\a\\t g:i A') : null; }
     private function memberKey(InvitationParty $party, int $memberId): string { return hash_hmac('sha256', "party-member:{$party->rsvp_token}:{$memberId}", config('app.key')); }
     private function mealKey(InvitationParty $party, int $mealId): string { return hash_hmac('sha256', "meal:{$party->rsvp_token}:{$mealId}", config('app.key')); }

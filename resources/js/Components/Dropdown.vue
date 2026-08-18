@@ -4,11 +4,13 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 const props = withDefaults(
     defineProps<{
         align?: 'left' | 'right';
+        placement?: 'top' | 'bottom';
         width?: '48';
         contentClasses?: string;
     }>(),
     {
         align: 'right',
+        placement: 'bottom',
         width: '48',
         contentClasses: 'py-1 bg-white',
     },
@@ -31,11 +33,11 @@ const widthClass = computed(() => {
 
 const alignmentClasses = computed(() => {
     if (props.align === 'left') {
-        return 'ltr:origin-top-left rtl:origin-top-right start-0';
+        return props.placement === 'top' ? 'ltr:origin-bottom-left rtl:origin-bottom-right start-0 bottom-full mb-2' : 'ltr:origin-top-left rtl:origin-top-right start-0 mt-2';
     } else if (props.align === 'right') {
-        return 'ltr:origin-top-right rtl:origin-top-left end-0';
+        return props.placement === 'top' ? 'ltr:origin-bottom-right rtl:origin-bottom-left end-0 bottom-full mb-2' : 'ltr:origin-top-right rtl:origin-top-left end-0 mt-2';
     } else {
-        return 'origin-top';
+        return props.placement === 'top' ? 'origin-bottom bottom-full mb-2' : 'origin-top mt-2';
     }
 });
 
@@ -65,7 +67,7 @@ const open = ref(false);
         >
             <div
                 v-show="open"
-                class="absolute z-50 mt-2 rounded-md shadow-lg"
+                class="absolute z-50 rounded-md shadow-lg"
                 :class="[widthClass, alignmentClasses]"
                 style="display: none"
                 @click="open = false"

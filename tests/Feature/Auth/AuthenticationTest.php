@@ -30,6 +30,22 @@ class AuthenticationTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
+    public function test_admin_and_customer_users_can_both_authenticate(): void
+    {
+        foreach (['admin', 'customer'] as $role) {
+            $user = User::factory()->create(['role' => $role]);
+
+            $response = $this->post('/login', [
+                'email' => $user->email,
+                'password' => 'password',
+            ]);
+
+            $this->assertAuthenticatedAs($user);
+            $response->assertRedirect(route('dashboard', absolute: false));
+            $this->post('/logout')->assertRedirect('/');
+        }
+    }
+
     public function test_users_can_not_authenticate_with_invalid_password(): void
     {
         $user = User::factory()->create();

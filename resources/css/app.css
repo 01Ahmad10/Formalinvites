@@ -1,3 +1,172 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+    --fe-bg: #f7f5f2;
+    --fe-surface: #ffffff;
+    --fe-surface-elevated: #fcfbf9;
+    --fe-text: #24211f;
+    --fe-text-secondary: #625d57;
+    --fe-text-muted: #817a72;
+    --fe-border: #e6e0d9;
+    --fe-border-strong: #cec4ba;
+    --fe-primary: #2f2925;
+    --fe-primary-hover: #171310;
+    --fe-accent: #d4967d;
+    --fe-success: #2f6b4f;
+    --fe-warning: #97691d;
+    --fe-error: #a5403d;
+    --fe-radius: 0.75rem;
+    --fe-radius-sm: 0.5rem;
+    --fe-shadow: 0 1px 2px rgb(36 33 31 / 0.05), 0 8px 24px rgb(36 33 31 / 0.04);
+    --fe-shadow-elevated: 0 10px 30px rgb(36 33 31 / 0.10);
+    --fe-focus: 0 0 0 3px rgb(155 122 73 / 0.28);
+    --fe-font-display: 'Alice', Georgia, serif;
+    --fe-font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --fe-transition: 160ms ease;
+    --fe-page-standard: 72rem;
+    --fe-page-wide: 90rem;
+}
+
+@layer base {
+    body { color: var(--fe-text); background: var(--fe-bg); font-family: var(--fe-font-sans); }
+
+    .fe-app { min-height: 100vh; background: var(--fe-bg); color: var(--fe-text); }
+    .fe-app :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+        border-color: var(--fe-border-strong);
+        border-radius: var(--fe-radius-sm);
+        color: var(--fe-text);
+        background-color: var(--fe-surface);
+        box-shadow: none;
+    }
+    .fe-app :is(input:not([type='checkbox']):not([type='radio']), select, textarea):focus {
+        border-color: var(--fe-accent);
+        --tw-ring-color: rgb(155 122 73 / 0.25);
+        box-shadow: var(--fe-focus);
+    }
+    .fe-app label { color: var(--fe-text-secondary); }
+    .fe-app ::selection { color: white; background: var(--fe-primary); }
+}
+
+@layer components {
+    .fe-page { width: 100%; margin-inline: auto; padding: 1.5rem 1rem 2.5rem; }
+    .fe-page-standard { max-width: var(--fe-page-standard); }
+    .fe-page-wide { max-width: var(--fe-page-wide); }
+    .fe-page-full { max-width: none; }
+    .fe-page-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+    .fe-page-eyebrow { color: var(--fe-accent); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+    .fe-page-title, .fe-section-title, .fe-display-heading { color: var(--fe-text); font-family: var(--fe-font-display); font-weight: 400; }
+    .fe-page-title { font-size: 1.85rem; letter-spacing: -0.02em; line-height: 1.15; }
+    .fe-page-subtitle { max-width: 42rem; margin-top: 0.35rem; color: var(--fe-text-secondary); font-size: 0.875rem; line-height: 1.5; }
+
+    .fe-card { border: 1px solid var(--fe-border); border-radius: var(--fe-radius); background: var(--fe-surface); box-shadow: var(--fe-shadow); }
+    .fe-card-muted { background: var(--fe-surface-elevated); box-shadow: none; }
+    .fe-card-body { padding: 1.25rem; }
+    .fe-section-title { font-size: 1.25rem; line-height: 1.2; }
+    .fe-section-copy { margin-top: 0.25rem; color: var(--fe-text-secondary); font-size: 0.875rem; }
+
+    .fe-btn { display: inline-flex; min-height: 2.5rem; align-items: center; justify-content: center; gap: 0.5rem; border-radius: var(--fe-radius-sm); padding: 0.55rem 0.9rem; font-size: 0.875rem; font-weight: 600; line-height: 1.25rem; transition: color var(--fe-transition), background-color var(--fe-transition), border-color var(--fe-transition), box-shadow var(--fe-transition); }
+    .fe-btn:focus-visible, .fe-nav-link:focus-visible, .fe-account-trigger:focus-visible { outline: none; box-shadow: var(--fe-focus); }
+    .fe-btn:disabled { cursor: not-allowed; opacity: 0.55; }
+    .fe-btn-primary { color: white; background: var(--fe-primary); border: 1px solid var(--fe-primary); }
+    .fe-btn-primary:hover:not(:disabled) { background: var(--fe-primary-hover); border-color: var(--fe-primary-hover); }
+    .fe-btn-secondary { color: var(--fe-text); background: var(--fe-surface); border: 1px solid var(--fe-border-strong); }
+    .fe-btn-secondary:hover:not(:disabled) { background: var(--fe-surface-elevated); border-color: var(--fe-text-muted); }
+    .fe-btn-outline { color: var(--fe-primary); background: transparent; border: 1px solid var(--fe-primary); }
+    .fe-btn-outline:hover:not(:disabled) { color: white; background: var(--fe-primary); }
+    .fe-btn-ghost { color: var(--fe-text-secondary); background: transparent; border: 1px solid transparent; }
+    .fe-btn-ghost:hover:not(:disabled) { color: var(--fe-text); background: #eeeae5; }
+    .fe-btn-danger { color: white; background: var(--fe-error); border: 1px solid var(--fe-error); }
+    .fe-btn-danger:hover:not(:disabled) { background: #863230; border-color: #863230; }
+
+    .fe-badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: 0.2rem 0.55rem; font-size: 0.75rem; font-weight: 650; line-height: 1rem; }
+    .fe-badge-neutral { color: var(--fe-text-secondary); background: #eeeae5; }
+    .fe-badge-success { color: #20543b; background: #e8f2ec; }
+    .fe-badge-warning { color: #785217; background: #fbf0d8; }
+    .fe-badge-error { color: #873532; background: #f9e8e7; }
+    .fe-badge-accent { color: #694f2c; background: #f3eadc; }
+
+    .fe-table-wrap { overflow-x: auto; border: 1px solid var(--fe-border); border-radius: var(--fe-radius); background: var(--fe-surface); box-shadow: var(--fe-shadow); }
+    .fe-table { width: 100%; min-width: 44rem; border-collapse: collapse; color: var(--fe-text); font-size: 0.875rem; }
+    .fe-table thead { color: var(--fe-text-secondary); background: var(--fe-surface-elevated); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .fe-table th { padding: 0.8rem 1rem; text-align: left; }
+    .fe-table td { padding: 0.9rem 1rem; border-top: 1px solid var(--fe-border); vertical-align: top; }
+    .fe-table tbody tr { transition: background-color var(--fe-transition); }
+    .fe-table tbody tr:hover { background: #fcfaf7; }
+
+    .fe-empty-state { border: 1px dashed var(--fe-border-strong); border-radius: var(--fe-radius); padding: 2rem 1.25rem; text-align: center; color: var(--fe-text-secondary); background: var(--fe-surface-elevated); }
+    .fe-empty-state-title { color: var(--fe-text); font-weight: 650; }
+    .fe-empty-state-copy { margin: 0.35rem auto 0; max-width: 30rem; font-size: 0.875rem; }
+
+    .fe-form-label { display: block; color: var(--fe-text-secondary); font-size: 0.875rem; font-weight: 600; }
+    .fe-form-optional { color: var(--fe-text-muted); font-size: 0.75rem; font-weight: 500; }
+    .fe-form-error { color: var(--fe-error); font-size: 0.875rem; }
+    .fe-toast { border: 1px solid var(--fe-border); border-radius: var(--fe-radius); padding: 0.85rem 1rem; box-shadow: var(--fe-shadow-elevated); }
+    .fe-toast-success { color: #20543b; border-color: #b8d8c2; background: #f2faf4; }
+    .fe-toast-error { color: #873532; border-color: #ecc7c5; background: #fdf5f4; }
+    .fe-toast-warning { color: #785217; border-color: #ead3a1; background: #fffaf0; }
+    .fe-toast-info { color: #4d463e; border-color: var(--fe-border-strong); background: var(--fe-surface); }
+    .fe-nav-link { border-radius: var(--fe-radius-sm); padding: 0.5rem 0.7rem; color: var(--fe-text-secondary); font-size: 0.875rem; font-weight: 600; transition: color var(--fe-transition), background-color var(--fe-transition); }
+    .fe-nav-link:hover { color: var(--fe-text); background: var(--fe-surface-elevated); }
+    .fe-nav-link-active { color: var(--fe-primary); background: #eeeae5; }
+    .fe-account-trigger { display: inline-flex; align-items: center; gap: 0.6rem; border-radius: var(--fe-radius-sm); padding: 0.35rem 0.5rem; }
+    .fe-account-trigger:hover { background: var(--fe-surface-elevated); }
+    .fe-mobile-toggle { display: inline-flex; min-height: 2.5rem; min-width: 2.5rem; align-items: center; justify-content: center; border-radius: var(--fe-radius-sm); color: var(--fe-text-secondary); }
+    .fe-mobile-toggle:hover { color: var(--fe-text); background: var(--fe-surface-elevated); }
+    .fe-mobile-toggle:focus-visible { outline: none; box-shadow: var(--fe-focus); }
+    .fe-mobile-nav-link { display: block; border-radius: var(--fe-radius-sm); padding: 0.65rem 0.75rem; color: var(--fe-text-secondary); font-size: 0.95rem; font-weight: 600; }
+    .fe-mobile-nav-link:hover { color: var(--fe-text); background: var(--fe-surface-elevated); }
+    .fe-mobile-nav-link-active { color: var(--fe-primary); background: #eeeae5; }
+}
+
+@media (min-width: 640px) {
+    .fe-page { padding: 2rem 1.5rem 3rem; }
+    .fe-page-title { font-size: 1.875rem; }
+    .fe-card-body { padding: 1.5rem; }
+}
+
+/* Kept outside Tailwind layers so legacy authenticated form utility classes inherit the shared focus treatment. */
+.fe-app :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+    border-color: var(--fe-border-strong);
+    border-radius: var(--fe-radius-sm);
+    color: var(--fe-text);
+    background-color: var(--fe-surface);
+}
+.fe-app :is(input:not([type='checkbox']):not([type='radio']), select, textarea):focus {
+    border-color: var(--fe-accent);
+    --tw-ring-color: rgb(155 122 73 / 0.25);
+    box-shadow: var(--fe-focus);
+}
+
+.fe-shell { display: flex; }
+.fe-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 40; display: flex; width: 17rem; flex-direction: column; padding: 1.75rem 1rem; border-right: 1px solid var(--fe-border); background: var(--fe-surface); box-shadow: 2px 0 18px rgb(36 33 31 / 0.03); }
+.fe-sidebar-brand { display: flex; min-height: 8.5rem; align-items: center; justify-content: center; border-bottom: 1px solid var(--fe-border); padding: 0.5rem 0 1.25rem; }
+.fe-brand-logo { display: block; width: min(100%, 13.25rem); height: auto; object-fit: contain; }
+.fe-sidebar-nav { display: grid; gap: 0.25rem; padding-top: 1.5rem; }
+.fe-sidebar-link { display: flex; min-height: 2.75rem; align-items: center; gap: 0.75rem; border-radius: var(--fe-radius-sm); padding: 0.6rem 0.75rem; color: var(--fe-text-secondary); font-size: 0.925rem; font-weight: 600; transition: background-color var(--fe-transition), color var(--fe-transition); }
+.fe-sidebar-link:hover { color: var(--fe-text); background: var(--fe-surface-elevated); }
+.fe-sidebar-link:focus-visible, .fe-sidebar-account:focus-visible { outline: none; box-shadow: var(--fe-focus); }
+.fe-sidebar-link-active { color: var(--fe-text); background: #f9ece7; box-shadow: inset 3px 0 0 var(--fe-accent); }
+.fe-sidebar-icon { display: flex; width: 1.1rem; align-items: center; justify-content: center; color: var(--fe-accent); font-size: 1.05rem; }
+.fe-sidebar-account { display: flex; width: 100%; align-items: center; gap: 0.7rem; border-radius: var(--fe-radius-sm); padding: 0.5rem; color: var(--fe-text); }
+.fe-sidebar-account:hover { background: var(--fe-surface-elevated); }
+.fe-main { min-width: 0; flex: 1 1 auto; margin-left: 17rem; }
+.fe-mobile-bar { display: flex; min-height: 4rem; align-items: center; gap: 1rem; border-bottom: 1px solid var(--fe-border); background: var(--fe-surface); padding: 0.65rem 1rem; }
+.fe-mobile-logo { display: block; width: clamp(7.5rem, 38vw, 9.0625rem); min-width: 0; height: auto; object-fit: contain; }
+.fe-mobile-menu { position: fixed; inset: 0; z-index: 60; display: flex; width: 100%; min-height: 100dvh; flex-direction: column; overflow-y: auto; pointer-events: auto; background: var(--fe-surface); padding: 0 1rem 1.25rem; }
+.fe-mobile-menu-header { display: flex; min-height: 4rem; align-items: center; gap: 1rem; margin: 0 -1rem; border-bottom: 1px solid var(--fe-border); padding: 0.65rem 1rem; }
+.fe-mobile-menu-nav { display: grid; gap: 0.375rem; padding-top: 1.25rem; }
+.fe-mobile-menu .fe-sidebar-link { min-height: 3.25rem; }
+.fe-mobile-menu-account { margin-top: auto; border-top: 1px solid var(--fe-border); padding-top: 1rem; }
+@media (max-width: 1023px) { .fe-sidebar { display: none; } .fe-main { margin-left: 0; } }
+
+/* Legacy authenticated actions still use Tailwind colour utilities. Keep their visual output on the shared palette while pages are incrementally moved to Button. */
+.fe-app .bg-indigo-600, .fe-app .bg-indigo-700, .fe-app .bg-gray-800 { background-color: var(--fe-primary); }
+.fe-app .hover\:bg-indigo-700:hover, .fe-app .hover\:bg-indigo-800:hover, .fe-app .hover\:bg-gray-700:hover { background-color: var(--fe-primary-hover); }
+.fe-app .text-indigo-400, .fe-app .text-indigo-500, .fe-app .text-indigo-600, .fe-app .text-indigo-700, .fe-app .text-indigo-800 { color: var(--fe-primary); }
+.fe-app .border-indigo-400, .fe-app .border-indigo-500, .fe-app .border-indigo-600, .fe-app .border-indigo-700 { border-color: var(--fe-accent); }
+.fe-app .bg-indigo-50, .fe-app .bg-indigo-100 { background-color: #f9ece7; }
+.fe-app .hover\:bg-indigo-50:hover, .fe-app .hover\:bg-indigo-100:hover { background-color: #f3eadc; }
+.fe-app .focus\:border-indigo-500:focus, .fe-app .focus\:border-indigo-700:focus { border-color: var(--fe-accent); }
+.fe-app .focus\:ring-indigo-500:focus, .fe-app .focus\:ring-indigo-600:focus, .fe-app .focus\:ring-indigo-700:focus { --tw-ring-color: rgb(155 122 73 / 0.25); box-shadow: var(--fe-focus); }

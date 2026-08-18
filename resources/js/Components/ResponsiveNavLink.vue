@@ -9,8 +9,8 @@ const props = defineProps<{
 
 const classes = computed(() =>
     props.active
-        ? 'block w-full ps-3 pe-4 py-2 border-l-4 border-indigo-400 text-start text-base font-medium text-indigo-700 bg-indigo-50 focus:outline-none focus:text-indigo-800 focus:bg-indigo-100 focus:border-indigo-700 transition duration-150 ease-in-out'
-        : 'block w-full ps-3 pe-4 py-2 border-l-4 border-transparent text-start text-base font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:text-gray-800 focus:bg-gray-50 focus:border-gray-300 transition duration-150 ease-in-out',
+        ? 'block w-full ps-3 pe-4 py-2 border-l-4 border-[color:var(--fe-accent)] text-start text-base font-medium text-[color:var(--fe-primary)] bg-[#f9ece7] focus:outline-none focus:text-[color:var(--fe-primary)] focus:bg-[#f3eadc] focus:border-[color:var(--fe-accent)] transition duration-150 ease-in-out'
+        : 'block w-full ps-3 pe-4 py-2 border-l-4 border-transparent text-start text-base font-medium text-[color:var(--fe-text-secondary)] hover:text-[color:var(--fe-text)] hover:bg-[color:var(--fe-surface-elevated)] hover:border-[color:var(--fe-border-strong)] focus:outline-none focus:text-[color:var(--fe-text)] focus:bg-[color:var(--fe-surface-elevated)] focus:border-[color:var(--fe-border-strong)] transition duration-150 ease-in-out',
 );
 </script>
 

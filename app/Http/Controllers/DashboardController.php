@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Support\InvitationPublicationSnapshotBuilder;
+use App\Support\AdminDashboardAnalytics;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(InvitationPublicationSnapshotBuilder $snapshots): Response
+    public function __invoke(InvitationPublicationSnapshotBuilder $snapshots, AdminDashboardAnalytics $analytics): Response
     {
         $user = request()->user();
         $relations = ['customer', 'package', 'payments', 'publications'];
@@ -22,6 +23,12 @@ class DashboardController extends Controller
             $event->setAttribute('invitation_status', $event->status === 'archived' ? 'archived' : (! $live ? 'setup' : ($dirty ? 'live_unpublished_changes' : 'live')));
             $event->unsetRelation('publications');
         });
-        return Inertia::render('Dashboard', ['events' => $events, 'isAdmin' => $user->isAdmin(), 'isSupport' => $user->isSupport()]);
+        $props = ['events' => $events, 'isAdmin' => $user->isAdmin(), 'isSupport' => $user->isSupport()];
+
+        if ($user->isAdmin()) {
+            $props['analytics'] = $analytics->data();
+        }
+
+        return Inertia::render('Dashboard', $props);
     }
 }

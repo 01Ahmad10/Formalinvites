@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PageHeader from '@/Components/UI/PageHeader.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps<{ event: any; eventTiming: any; activities: any[]; guestInfo: Record<string, string | null>; customer: any; paymentSummary: any; canEdit: boolean; canViewGuests: boolean; canManageGuests: boolean; canViewRsvps: boolean; canManageRsvps: boolean; isAdmin: boolean; workflow: any }>();
@@ -15,14 +16,9 @@ const archive = useForm({});
     <Head :title="event.title" />
 
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex items-center justify-between gap-4">
-                <div><h2 class="text-xl font-semibold">{{ event.title }}</h2><p class="text-sm text-gray-600">{{ isAdmin ? label(workflow.invitation_status) : (workflow.live_version ? 'Invitation Live' : 'Invitation Setup') }}</p></div>
-                <div class="flex flex-wrap gap-2"><Link :href="route('events.index')" class="rounded border border-gray-300 px-3 py-2 text-sm">Back to Events</Link><Link v-if="canEdit" :href="route('events.setup', event.id)" class="rounded bg-indigo-600 px-3 py-2 text-sm text-white">Edit Invitation</Link><Link v-else :href="route('events.invitation.edit', event.id)" class="rounded border border-gray-300 px-3 py-2 text-sm">Invitation</Link><Link :href="route('events.activities.index', event.id)" class="rounded border border-gray-300 px-3 py-2 text-sm">Schedule</Link><Link v-if="canViewGuests" :href="route('events.guests.index', event.id)" class="rounded border border-gray-300 px-3 py-2 text-sm">Guests</Link><Link v-if="canViewRsvps" :href="route('events.rsvps.index', event.id)" class="rounded border border-gray-300 px-3 py-2 text-sm">RSVPs</Link></div>
-            </div>
-        </template>
+        <template #header><PageHeader :title="event.title" :subtitle="isAdmin ? label(workflow.invitation_status) : (workflow.live_version ? 'Invitation Live' : 'Invitation Setup')"><template #actions><Link :href="route('events.index')" class="fe-btn fe-btn-secondary">Back to Events</Link><Link v-if="canEdit" :href="route('events.setup', event.id)" class="fe-btn fe-btn-primary">Edit Invitation</Link><Link v-else :href="route('events.invitation.edit', event.id)" class="fe-btn fe-btn-secondary">Invitation</Link><Link :href="route('events.activities.index', event.id)" class="fe-btn fe-btn-secondary">Schedule</Link><Link v-if="canViewGuests" :href="route('events.guests.index', event.id)" class="fe-btn fe-btn-secondary">Guests</Link><Link v-if="canViewRsvps" :href="route('events.rsvps.index', event.id)" class="fe-btn fe-btn-secondary">RSVPs</Link></template></PageHeader></template>
 
-        <div class="mx-auto max-w-5xl space-y-6 p-6">
+        <div class="fe-page fe-page-standard space-y-6">
             <section class="rounded bg-white p-6 shadow sm:rounded-lg">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div><h3 class="text-lg font-semibold">Invitation</h3><p class="mt-1 text-sm text-gray-600"><span class="font-medium">{{ isAdmin ? label(workflow.invitation_status) : (workflow.live_version ? 'Invitation Live' : 'Continue invitation setup') }}</span><span v-if="isAdmin && workflow.live_version"> · Version {{ workflow.live_version }}</span></p><p v-if="workflow.live_version" class="mt-2 text-sm text-emerald-700">{{ isAdmin ? 'Your invitation is live. Valid invitation changes are published automatically.' : 'Your invitation is live.' }}</p></div>

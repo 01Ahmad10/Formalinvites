@@ -2,7 +2,7 @@
 import { router, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
-type Toast = { id: number; type: 'success' | 'error'; message: string };
+type Toast = { id: number; type: 'success' | 'error' | 'warning' | 'info'; message: string };
 const page = usePage<any>();
 const toasts = ref<Toast[]>([]);
 let nextId = 1;
@@ -28,4 +28,4 @@ router.on('error', (event) => {
 });
 </script>
 
-<template><div class="fixed right-4 top-4 z-50 w-full max-w-sm space-y-2" aria-live="polite"><div v-for="toast in toasts" :key="toast.id" :class="toast.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'" class="flex items-start justify-between rounded border p-4 shadow"><span>{{ toast.message }}</span><button @click="remove(toast.id)" class="ml-4 text-lg leading-none" aria-label="Dismiss notification">×</button></div></div></template>
+<template><div class="fixed right-4 top-4 z-50 w-[calc(100%-2rem)] max-w-sm space-y-2" aria-live="polite"><div v-for="toast in toasts" :key="toast.id" class="fe-toast flex items-start justify-between" :class="`fe-toast-${toast.type}`"><span class="text-sm font-medium leading-5">{{ toast.message }}</span><button @click="remove(toast.id)" class="ml-4 min-h-6 min-w-6 rounded text-lg leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-current" aria-label="Dismiss notification">×</button></div></div></template>

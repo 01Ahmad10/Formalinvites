@@ -28,7 +28,6 @@ class DatabaseSeeder extends Seeder
     {
         $password = Hash::make('password');
         $admin = User::firstOrCreate(['email' => 'admin@formalevites.test'], ['name' => 'Admin User', 'role' => 'admin', 'password' => $password]);
-        User::firstOrCreate(['email' => 'support@formalevites.test'], ['name' => 'Support User', 'role' => 'support', 'password' => $password]);
         $first = Customer::firstOrCreate(['name' => 'Cedar Celebrations'], ['contact_name' => 'Maya Haddad', 'email' => 'maya@example.test', 'is_active' => true]);
         $second = Customer::firstOrCreate(['name' => 'Olive Events'], ['contact_name' => 'Karim Nasser', 'email' => 'karim@example.test', 'is_active' => true]);
         $maya = User::firstOrCreate(['email' => 'maya@formalevites.test'], ['name' => 'Maya Haddad', 'role' => 'customer', 'customer_id' => $first->id, 'password' => $password]);
@@ -43,7 +42,7 @@ class DatabaseSeeder extends Seeder
         Template::firstOrCreate(['slug' => 'modern-cinematic'], ['name' => 'Modern Cinematic', 'description' => 'A dark, immersive invitation experience.', 'category' => 'cinematic', 'component_key' => 'modern-cinematic', 'supported_event_types' => ['wedding', 'engagement', 'birthday', 'graduation'], 'default_settings' => InvitationTemplateSettings::modernCinematicDefaults(), 'is_active' => true, 'is_customer_selectable' => true, 'display_order' => 5]);
         $wedding = Event::firstOrCreate(['title' => 'Maya and Elias Wedding'], ['customer_id' => $first->id, 'event_package_id' => $packages[1]->id, 'event_type' => 'wedding', 'host_name' => 'Maya Haddad', 'main_date' => now()->addMonths(3)->toDateString(), 'venue' => 'Cedar Hall', 'status' => 'approved']);
         $birthday = Event::firstOrCreate(['title' => 'Nour Birthday'], ['customer_id' => $first->id, 'event_package_id' => $packages[0]->id, 'event_type' => 'birthday', 'host_name' => 'Maya Haddad', 'main_date' => now()->addMonth()->toDateString(), 'status' => 'draft']);
-        $engagement = Event::firstOrCreate(['title' => 'Karim and Rania Engagement'], ['customer_id' => $second->id, 'event_package_id' => $packages[2]->id, 'event_type' => 'engagement', 'host_name' => 'Karim Nasser', 'main_date' => now()->addMonths(2)->toDateString(), 'status' => 'submitted']);
+        $engagement = Event::firstOrCreate(['title' => 'Karim and Rania Engagement'], ['customer_id' => $second->id, 'event_package_id' => $packages[2]->id, 'event_type' => 'engagement', 'host_name' => 'Karim Nasser', 'main_date' => now()->addMonths(2)->toDateString(), 'status' => 'draft']);
         $wedding->update([
             'event_timezone' => 'America/New_York',
             'rsvp_deadline' => $wedding->main_date?->copy()->subDays(10)->toDateString(),

@@ -26,20 +26,18 @@ class AdminController extends Controller
             ->with(['users' => fn ($query) => $query->where('role', 'customer')->orderBy('customer_account_role')->orderBy('id'), 'events' => fn ($query) => $query->with(['package', 'payments'])->withCount('publications')])
             ->withCount(['users' => fn ($query) => $query->where('role', 'customer'), 'events'])
             ->when($search, fn ($query) => $query->where(fn ($query) => $query->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
-            ->latest()->get()
-            ->map(fn (Customer $customer) => $this->customerForList($customer))->values();
+            ->latest()->paginate(25)->withQueryString();
+        $customers->getCollection()->transform(fn (Customer $customer) => $this->customerForList($customer));
 
         return Inertia::render('Admin/Customers', [
-            'customers' => $customers,
+            'customers' => $customers->items(),
             'packages' => EventPackage::query()->where('is_active', true)->capacityOrder()->get(['id','name','minimum_guests','maximum_guests','price']),
             'filters' => ['search' => $search],
+            'pagination' => $this->pagination($customers),
         ]);
     }
     public function storeCustomer(Request $r): RedirectResponse { Customer::create($r->validate(['name'=>'required|string|max:255','contact_name'=>'nullable|string|max:255','email'=>'nullable|email','phone'=>'nullable|string|max:50','is_active'=>'boolean'])); return back()->with('success','Customer created.'); }
     public function updateCustomer(Request $r, Customer $customer): RedirectResponse { $customer->update($r->validate(['name'=>'required|string|max:255','contact_name'=>'nullable|string|max:255','email'=>'nullable|email','phone'=>'nullable|string|max:50','is_active'=>'boolean'])); return back()->with('success','Customer updated.'); }
-    public function users(Request $request): Response { $search = $request->string('search')->trim()->toString(); $users = User::with('customer')->where('role','customer')->when($search, fn ($query) => $query->where(fn ($query) => $query->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$search}%"))))->latest()->get(); return Inertia::render('Admin/Users', ['users'=>$users, 'customers'=>Customer::where('is_active',true)->get(), 'filters' => ['search' => $search]]); }
-    public function storeUser(Request $r): RedirectResponse { $data=$r->validate(['customer_id'=>'required|exists:customers,id','name'=>'required|string|max:255','email'=>'required|email|unique:users,email','password'=>'required|string|min:8']); $this->ensureCustomerAccountSpace((int) $data['customer_id']); User::create([...$data,'role'=>'customer','customer_account_role'=>'secondary','password'=>Hash::make($data['password'])]); return back()->with('success','Customer user created.'); }
-
     public function storeClient(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -65,16 +63,19 @@ class AdminController extends Controller
 
     public function showCustomer(Customer $customer): Response
     {
-        $customer->load(['users' => fn ($query) => $query->where('role','customer')->orderBy('customer_account_role'), 'events.package', 'events.payments']);
-        return Inertia::render('Admin/ClientDetails', ['customer' => $customer, 'customerUsers' => $customer->users, 'events' => $customer->events->map(fn (Event $event) => ['id'=>$event->id,'title'=>$event->title,'invitation_status'=>$event->status === 'archived' ? 'Archived' : ($event->publications()->exists() ? 'Active' : 'Setup'),'guest_capacity'=>$event->effectiveGuestCapacity(),'package'=>$event->package?->only(['name','minimum_guests','maximum_guests','price']),'finance'=>['has_record'=>$event->payments->isNotEmpty(),'final_amount'=>(float) $event->payments->sum('final_amount'),'paid_amount'=>(float) $event->payments->sum('paid_amount'),'remaining_amount'=>$event->payments->sum(fn ($payment) => $payment->remainingAmount())]])->values(), 'canAddSecondLogin' => $customer->users->count() < 2]);
+        $customer->load(['users' => fn ($query) => $query->where('role','customer')->orderBy('customer_account_role'), 'events.package', 'events.payments', 'events' => fn ($query) => $query->withCount('publications')]);
+        return Inertia::render('Admin/ClientDetails', ['customer' => $customer, 'customerUsers' => $customer->users, 'events' => $customer->events->map(fn (Event $event) => ['id'=>$event->id,'title'=>$event->title,'invitation_status'=>$event->status === 'archived' ? 'Archived' : ($event->publications_count ? 'Active' : 'Setup'),'guest_capacity'=>$event->effectiveGuestCapacity(),'package'=>$event->package?->only(['name','minimum_guests','maximum_guests','price']),'finance'=>['has_record'=>$event->payments->isNotEmpty(),'final_amount'=>(float) $event->payments->sum('final_amount'),'paid_amount'=>(float) $event->payments->sum('paid_amount'),'remaining_amount'=>$event->payments->sum(fn ($payment) => $payment->remainingAmount())]])->values(), 'canAddSecondLogin' => $customer->users->count() < 2]);
     }
 
     public function storeSecondLogin(Request $request, Customer $customer): RedirectResponse
     {
-        $this->ensureCustomerAccountSpace($customer->id);
         $data = $request->validate(['name'=>['required','string','max:255'],'email'=>['required','email','unique:users,email'],'password'=>['required','string','min:8']]);
-        $user = User::create([...$data,'customer_id'=>$customer->id,'role'=>'customer','customer_account_role'=>'secondary','password'=>Hash::make($data['password'])]);
-        $customer->events()->each(fn (Event $event) => $event->members()->syncWithoutDetaching([$user->id => ['role'=>'editor']]));
+        DB::transaction(function () use ($customer, $data): void {
+            $customer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
+            $this->ensureCustomerAccountSpace($customer->id, true);
+            $user = User::create([...$data,'customer_id'=>$customer->id,'role'=>'customer','customer_account_role'=>'secondary','password'=>Hash::make($data['password'])]);
+            $customer->events()->each(fn (Event $event) => $event->members()->syncWithoutDetaching([$user->id => ['role'=>'editor']]));
+        });
         return back()->with('success','Second client login added.');
     }
 
@@ -86,9 +87,11 @@ class AdminController extends Controller
         return back()->with('success','Client password reset.');
     }
 
-    private function ensureCustomerAccountSpace(int $customerId): void
+    private function ensureCustomerAccountSpace(int $customerId, bool $lock = false): void
     {
-        if (User::query()->where('customer_id',$customerId)->where('role','customer')->count() >= 2) throw ValidationException::withMessages(['customer_id'=>'A Client can have at most two login accounts.']);
+        $accounts = User::query()->where('customer_id',$customerId)->where('role','customer');
+        if ($lock) $accounts->lockForUpdate();
+        if ($accounts->count() >= 2) throw ValidationException::withMessages(['customer_id'=>'A Client can have at most two login accounts.']);
     }
 
     private function packageForCapacity(int $capacity): EventPackage
@@ -124,23 +127,22 @@ class AdminController extends Controller
         $search = $request->string('search')->trim()->toString();
         $status = $request->string('status')->toString();
         $customerId = $request->integer('customer_id');
-        $payments = Payment::with(['customer', 'event', 'package', 'latestTransaction'])
+        $paymentQuery = Payment::query()
             ->when($search, fn ($query) => $query->where(fn ($query) => $query->where('coupon_code', 'like', "%{$search}%")->orWhereHas('transactions', fn ($transactions) => $transactions->where('reference', 'like', "%{$search}%"))->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$search}%"))->orWhereHas('event', fn ($event) => $event->where('title', 'like', "%{$search}%"))))
             ->when(in_array($status, Payment::STATUSES, true), fn ($query) => $query->where('status', $status))
-            ->when($customerId, fn ($query) => $query->where('customer_id', $customerId))
-            ->latest()->get();
-        $summary = [
-            'total_final_amount' => $payments->sum(fn ($payment) => (float) $payment->final_amount),
-            'total_paid_amount' => $payments->sum(fn ($payment) => (float) $payment->paid_amount),
-            'total_remaining_amount' => $payments->sum(fn ($payment) => $payment->remainingAmount()),
-            'unpaid_count' => $payments->where('status', 'unpaid')->count(),
-            'partially_paid_count' => $payments->where('status', 'partially_paid')->count(),
-            'paid_count' => $payments->where('status', 'paid')->count(),
-        ];
+            ->when($customerId, fn ($query) => $query->where('customer_id', $customerId));
+        $summary = (clone $paymentQuery)->selectRaw("COALESCE(SUM(final_amount), 0) as total_final_amount, COALESCE(SUM(paid_amount), 0) as total_paid_amount, COALESCE(SUM(CASE WHEN final_amount > paid_amount THEN final_amount - paid_amount ELSE 0 END), 0) as total_remaining_amount, SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_count, SUM(CASE WHEN status = 'partially_paid' THEN 1 ELSE 0 END) as partially_paid_count, SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count")->first();
+        $payments = $paymentQuery->with(['customer:id,name', 'event:id,title', 'package:id,name', 'latestTransaction'])
+            ->latest()->paginate(25)->withQueryString();
 
-        $availableCoupons = Coupon::where('is_active', true)->orderBy('code')->get()->filter(fn (Coupon $coupon) => $coupon->isAvailableFor())->values();
+        $today = now()->toDateString();
+        $availableCoupons = Coupon::query()->where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('starts_at')->orWhereDate('starts_at', '<=', $today))
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhereDate('expires_at', '>=', $today))
+            ->withCount('payments')->orderBy('code')->get(['id', 'code', 'discount_type', 'discount_value', 'usage_limit'])
+            ->filter(fn (Coupon $coupon) => $coupon->usage_limit === null || $coupon->payments_count < $coupon->usage_limit)->values();
 
-        return Inertia::render('Admin/Payments', ['payments' => $payments, 'summary' => $summary, 'customers' => Customer::where('is_active', true)->get(), 'events' => Event::with('package')->latest()->get(), 'coupons' => $availableCoupons, 'filters' => ['search' => $search, 'status' => $status, 'customer_id' => $customerId ?: '']]);
+        return Inertia::render('Admin/Payments', ['payments' => $payments->items(), 'summary' => $summary, 'customers' => Customer::where('is_active', true)->orderBy('name')->get(['id', 'name']), 'events' => Event::with('package:id,name,price')->latest()->get(['id', 'customer_id', 'title', 'event_package_id']), 'coupons' => $availableCoupons, 'filters' => ['search' => $search, 'status' => $status, 'customer_id' => $customerId ?: ''], 'pagination' => $this->pagination($payments)]);
     }
 
     public function storePayment(Request $request): RedirectResponse
@@ -161,22 +163,22 @@ class AdminController extends Controller
         $originalAmount = round((float) $data['original_amount'], 2);
         if (($data['coupon_id'] ?? null) && (($data['discount_type'] ?? null) || ($data['discount_value'] ?? null) !== null)) throw ValidationException::withMessages(['coupon_id' => 'Choose either a coupon or a manual discount, not both.']);
 
-        $coupon = null;
-        if ($data['coupon_id'] ?? null) {
-            $coupon = Coupon::findOrFail($data['coupon_id']);
-            if (! $coupon->isAvailableFor()) throw ValidationException::withMessages(['coupon_id' => 'This coupon is inactive, outside its valid dates, or has reached its usage limit.']);
-            $discountDetails = $this->calculateDiscount($originalAmount, $coupon->discount_type, (float) $coupon->discount_value);
-        } elseif ($data['discount_type'] ?? null) {
-            $discountDetails = $this->calculateDiscount($originalAmount, $data['discount_type'], (float) $data['discount_value']);
-        } else {
-            if (($data['discount_value'] ?? null) !== null) throw ValidationException::withMessages(['discount_type' => 'Choose a discount type before entering a discount value.']);
-            $discountDetails = ['amount' => 0.0, 'final_amount' => $originalAmount];
-        }
-
         $initialAmount = round((float) ($data['paid_amount'] ?? 0), 2);
-        if ($initialAmount > $discountDetails['final_amount']) throw ValidationException::withMessages(['paid_amount' => 'The initial payment cannot exceed the calculated final amount.']);
+        $payment = DB::transaction(function () use ($data, $originalAmount, $initialAmount, $request): Payment {
+            $coupon = null;
+            if ($data['coupon_id'] ?? null) {
+                // Serializing use of this coupon makes usage_limit reliable under concurrent Admin requests.
+                $coupon = Coupon::query()->lockForUpdate()->findOrFail($data['coupon_id']);
+                if (! $coupon->isAvailableFor()) throw ValidationException::withMessages(['coupon_id' => 'This coupon is inactive, outside its valid dates, or has reached its usage limit.']);
+                $discountDetails = $this->calculateDiscount($originalAmount, $coupon->discount_type, (float) $coupon->discount_value);
+            } elseif ($data['discount_type'] ?? null) {
+                $discountDetails = $this->calculateDiscount($originalAmount, $data['discount_type'], (float) $data['discount_value']);
+            } else {
+                if (($data['discount_value'] ?? null) !== null) throw ValidationException::withMessages(['discount_type' => 'Choose a discount type before entering a discount value.']);
+                $discountDetails = ['amount' => 0.0, 'final_amount' => $originalAmount];
+            }
+            if ($initialAmount > $discountDetails['final_amount']) throw ValidationException::withMessages(['paid_amount' => 'The initial payment cannot exceed the calculated final amount.']);
 
-        $payment = DB::transaction(function () use ($data, $originalAmount, $initialAmount, $discountDetails, $coupon, $request): Payment {
             $payment = Payment::create([
                 'customer_id' => $data['customer_id'], 'event_id' => $data['event_id'] ?? null, 'event_package_id' => $data['event_package_id'] ?? null,
                 'coupon_id' => $coupon?->id, 'coupon_code' => $coupon?->code,
@@ -227,18 +229,21 @@ class AdminController extends Controller
     {
         abort_unless($request->user()->can('update', $payment), 403);
         $data = $request->validate(['coupon_id' => ['required', 'exists:coupons,id']]);
-        $coupon = Coupon::findOrFail($data['coupon_id']);
-        if (! $coupon->isAvailableFor($payment)) throw ValidationException::withMessages(['coupon_id' => 'This coupon is inactive, outside its valid dates, or has reached its usage limit.']);
-
-        $this->applyDiscount($payment, $coupon->discount_type, (float) $coupon->discount_value);
-        $payment->update(['coupon_id' => $coupon->id, 'coupon_code' => $coupon->code]);
+        DB::transaction(function () use ($data, $payment): void {
+            $payment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+            $coupon = Coupon::query()->lockForUpdate()->findOrFail($data['coupon_id']);
+            if (! $coupon->isAvailableFor($payment)) throw ValidationException::withMessages(['coupon_id' => 'This coupon is inactive, outside its valid dates, or has reached its usage limit.']);
+            $this->applyDiscount($payment, $coupon->discount_type, (float) $coupon->discount_value);
+            $payment->update(['coupon_id' => $coupon->id, 'coupon_code' => $coupon->code]);
+        });
 
         return back()->with('success', 'Coupon applied. Its calculated discount has been saved on this financial record.');
     }
 
     public function coupons(): Response
     {
-        return Inertia::render('Admin/Coupons', ['coupons' => Coupon::latest()->get(), 'discountTypes' => Coupon::DISCOUNT_TYPES]);
+        $coupons = Coupon::query()->latest()->paginate(25)->withQueryString();
+        return Inertia::render('Admin/Coupons', ['coupons' => $coupons->items(), 'pagination' => $this->pagination($coupons), 'discountTypes' => Coupon::DISCOUNT_TYPES]);
     }
 
     public function storeCoupon(Request $request): RedirectResponse
@@ -283,5 +288,16 @@ class AdminController extends Controller
         $data = $request->validate(['code' => ['required', 'string', 'max:100', Rule::unique('coupons', 'code')->ignore($coupon)], 'description' => ['nullable', 'string', 'max:255'], 'discount_type' => ['required', Rule::in(Coupon::DISCOUNT_TYPES)], 'discount_value' => ['required', 'numeric', 'min:0'], 'is_active' => ['boolean'], 'starts_at' => ['nullable', 'date'], 'expires_at' => ['nullable', 'date', 'after_or_equal:starts_at'], 'usage_limit' => ['nullable', 'integer', 'min:1']]);
         if ($data['discount_type'] === 'percentage' && (float) $data['discount_value'] > 100) throw ValidationException::withMessages(['discount_value' => 'A percentage discount cannot exceed 100%.']);
         return $data;
+    }
+
+    private function pagination($paginator): array
+    {
+        return [
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'total' => $paginator->total(),
+            'prev_page_url' => $paginator->previousPageUrl(),
+            'next_page_url' => $paginator->nextPageUrl(),
+        ];
     }
 }

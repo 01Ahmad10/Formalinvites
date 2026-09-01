@@ -3,10 +3,11 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import ConfirmationModal from '@/Components/ConfirmationModal.vue';
 import InputError from '@/Components/InputError.vue';
 import ValidationSummary from '@/Components/ValidationSummary.vue';
+import Pagination from '@/Components/UI/Pagination.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { reactive, ref } from 'vue';
 
-const props = defineProps<{ event: any; parties: any[]; summary: any; filters: any; canManage: boolean }>();
+const props = defineProps<{ event: any; parties: any[]; pagination?: any; summary: any; filters: any; canManage: boolean }>();
 const filters = reactive({ ...props.filters });
 const form = useForm({ name: '', primary_contact_name: '', email: '', phone: '', maximum_party_size: 1, table_name: '', notes: '' });
 const pendingParty = ref<any>(null);
@@ -27,6 +28,7 @@ const updateActive = () => router.patch(route('events.guests.active', [props.eve
             <form @submit.prevent="apply" class="flex flex-wrap gap-2"><input v-model="filters.search" placeholder="Search party, contact, email, phone, member" class="rounded border-gray-300" /><select v-model="filters.active" class="rounded border-gray-300"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select><select v-model="filters.members" class="rounded border-gray-300"><option value="">All parties</option><option value="with">Has members</option><option value="without">No members</option></select><button class="rounded bg-gray-800 px-3 text-white">Search</button><button type="button" @click="reset" class="text-gray-600">Reset</button></form>
 
             <div class="overflow-x-auto bg-white shadow"><table class="min-w-full text-left text-sm"><thead class="bg-gray-50 text-gray-600"><tr><th class="p-3">Party</th><th class="p-3">Primary contact</th><th class="p-3">Email / phone</th><th class="p-3">Maximum size</th><th class="p-3">Listed members</th><th class="p-3">Table</th><th class="p-3">Status</th><th class="p-3">Actions</th></tr></thead><tbody><tr v-for="party in parties" :key="party.id" class="border-t"><td class="p-3 font-medium">{{ party.name }}</td><td class="p-3">{{ party.primary_contact_name || 'Not provided' }}</td><td class="p-3">{{ party.email || 'No email' }}<br /><span class="text-gray-500">{{ party.phone || 'No phone' }}</span></td><td class="p-3">{{ party.maximum_party_size }}</td><td class="p-3">{{ party.members_count }}</td><td class="p-3">{{ party.table_name || 'Not assigned' }}</td><td class="p-3">{{ party.is_active ? 'Active' : 'Inactive' }}</td><td class="p-3"><div class="flex items-center gap-2 whitespace-nowrap"><Link :href="route('events.guests.show', [event.id, party.id])" class="text-indigo-600">View</Link><span v-if="canManage" class="text-gray-300">|</span><Link v-if="canManage" :href="`${route('events.guests.show', [event.id, party.id])}#party-edit`" class="text-indigo-600">Edit</Link><span v-if="canManage" class="text-gray-300">|</span><button v-if="canManage" @click="pendingParty = party" class="text-indigo-600">{{ party.is_active ? 'Deactivate' : 'Reactivate' }}</button></div></td></tr></tbody></table><p v-if="!parties.length" class="p-5 text-gray-600">No invitation parties match your search or filters.</p></div>
+            <Pagination :pagination="pagination" />
         </div>
         <ConfirmationModal :show="!!pendingParty" :title="pendingParty?.is_active ? 'Deactivate invitation party?' : 'Activate invitation party?'" :message="pendingParty?.is_active ? 'This party will no longer reserve event capacity.' : 'This party will reserve its maximum party size from event capacity again.'" :confirm-label="pendingParty?.is_active ? 'Deactivate party' : 'Activate party'" @close="pendingParty = null" @confirm="updateActive" />
     </AuthenticatedLayout>

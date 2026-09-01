@@ -21,16 +21,19 @@ class AdminDashboardAnalytics
             ->whereHas('publications')
             ->count();
 
-        $payments = Payment::query()
-            ->withSum(['transactions as confirmed_amount' => fn ($query) => $query->where('status', 'confirmed')], 'amount')
-            ->get(['id', 'final_amount']);
-        $revenue = round((float) $payments->sum('final_amount'), 2);
-        $collected = round((float) PaymentTransaction::query()->where('status', 'confirmed')->sum('amount'), 2);
-
-        // A payment that is overpaid must not erase the balance on a different payment.
-        $outstanding = round((float) $payments->sum(
-            fn (Payment $payment) => max((float) $payment->final_amount - (float) ($payment->confirmed_amount ?? 0), 0)
-        ), 2);
+        $confirmedByPayment = PaymentTransaction::query()
+            ->selectRaw('payment_id, SUM(amount) as confirmed_amount')
+            ->where('status', 'confirmed')
+            ->groupBy('payment_id');
+        $financials = Payment::query()->leftJoinSub($confirmedByPayment, 'confirmed_transactions', 'confirmed_transactions.payment_id', '=', 'payments.id')
+            ->selectRaw('COALESCE(SUM(payments.final_amount), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(confirmed_transactions.confirmed_amount), 0) as collected')
+            // An overpayment must not erase the balance on a different financial record.
+            ->selectRaw('COALESCE(SUM(CASE WHEN payments.final_amount > COALESCE(confirmed_transactions.confirmed_amount, 0) THEN payments.final_amount - COALESCE(confirmed_transactions.confirmed_amount, 0) ELSE 0 END), 0) as outstanding')
+            ->first();
+        $revenue = round((float) $financials->revenue, 2);
+        $collected = round((float) $financials->collected, 2);
+        $outstanding = round((float) $financials->outstanding, 2);
 
         $activePartyCount = InvitationParty::query()->where('is_active', true)->count();
         // Public RSVP submissions always set submitted_at, including a decline.

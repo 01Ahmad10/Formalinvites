@@ -178,7 +178,6 @@ class EventActivityTest extends TestCase
     {
         $customer = Customer::create(['name' => 'Customer']);
         $editor = User::factory()->create(['role' => 'customer', 'customer_id' => $customer->id]);
-        $support = User::factory()->create(['role' => 'support']);
         $outsider = User::factory()->create(['role' => 'customer', 'customer_id' => Customer::create(['name' => 'Other'])->id]);
         $event = $this->event($customer);
         $event->members()->attach($editor, ['role' => 'editor']);
@@ -192,8 +191,6 @@ class EventActivityTest extends TestCase
         $this->actingAs($editor)->put(route('events.activities.update', [$event, $first]), $this->activityPayload(['title' => 'Updated']))->assertRedirect();
         $this->actingAs($editor)->patch(route('events.activities.active', [$event, $first]), ['is_active' => false])->assertRedirect();
         $this->assertDatabaseHas('event_activities', ['id' => $first->id, 'is_active' => false]);
-        $this->actingAs($support)->get(route('events.activities.index', $event))->assertOk();
-        $this->actingAs($support)->post(route('events.activities.store', $event), $this->activityPayload())->assertForbidden();
         $this->actingAs($outsider)->get(route('events.activities.index', $event))->assertForbidden();
         $this->actingAs($editor)->get(route('events.activities.show', [$event, $otherActivity]))->assertNotFound();
     }

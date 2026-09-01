@@ -55,5 +55,4 @@ class User extends Authenticatable
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function managedEvents(): BelongsToMany { return $this->belongsToMany(Event::class)->withPivot('role')->withTimestamps(); }
     public function isAdmin(): bool { return $this->role === 'admin'; }
-    public function isSupport(): bool { return $this->role === 'support'; }
 }

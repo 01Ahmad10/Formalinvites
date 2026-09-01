@@ -10,6 +10,8 @@ use App\Models\InvitationParty;
 use App\Models\Rsvp;
 use App\Models\User;
 use App\Support\InvitationPublicationSnapshotBuilder;
+use App\Support\PublicRsvpPayload;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -96,6 +98,7 @@ class RsvpTest extends TestCase
 
     public function test_public_page_shares_submitted_rsvp_summary_data_and_safe_formatted_event_context(): void
     {
+        Carbon::setTestNow('2026-08-12 12:00:00');
         $event = $this->event();
         $event->update(['main_date' => '2026-08-22', 'start_time' => '18:30', 'end_time' => '23:00', 'venue' => 'Cedar Hall', 'address' => '1 Cedar Street', 'location_url' => 'https://maps.example.test/cedar', 'rsvp_deadline' => '2026-08-20']);
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Party', 'maximum_party_size' => 1]);
@@ -109,6 +112,24 @@ class RsvpTest extends TestCase
         $event->update(['rsvp_deadline' => now()->subDay()->toDateString()]);
         $this->publish($event);
         $this->get(route('public.rsvp.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page->component('PublicRsvp')->where('rsvp.status', 'attending')->where('closed', true));
+        Carbon::setTestNow();
+    }
+
+    public function test_public_rsvp_uses_opaque_member_and_meal_keys(): void
+    {
+        $event = $this->event();
+        $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Party', 'maximum_party_size' => 1]);
+        $member = $party->members()->create(['first_name' => 'Nadia', 'member_type' => 'adult']);
+        $meal = $event->mealOptions()->create(['name' => 'Fish', 'is_active' => true]);
+        $this->publish($event);
+        $payload = app(PublicRsvpPayload::class);
+
+        $this->get(route('public.rsvp.show', $party->rsvp_token))->assertInertia(fn (Assert $page) => $page
+            ->where('party.members.0.id', $payload->invitationParty($party)['members'][0]['id'])
+            ->where('meals.0.id', $payload->invitationMeals($party)[0]['id'])
+        );
+        $this->assertNotSame((string) $member->id, $payload->invitationParty($party)['members'][0]['id']);
+        $this->assertNotSame((string) $meal->id, $payload->invitationMeals($party)[0]['id']);
     }
 
     public function test_public_submission_cannot_exceed_capacity_or_use_wrong_or_inactive_meal(): void
@@ -145,7 +166,6 @@ class RsvpTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $customer = Customer::create(['name' => 'Customer']);
         $owner = User::factory()->create(['role' => 'customer', 'customer_id' => $customer->id]);
-        $support = User::factory()->create(['role' => 'support']);
         $event = $this->event($customer);
         $event->members()->attach($owner, ['role' => 'editor']);
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Party', 'maximum_party_size' => 4]);
@@ -154,8 +174,6 @@ class RsvpTest extends TestCase
         $rsvp->personResponses()->createMany([['first_name' => 'Adult', 'member_type' => 'adult', 'is_attending' => true], ['first_name' => 'Child', 'member_type' => 'child', 'is_attending' => true], ['first_name' => 'Declined', 'member_type' => 'adult', 'is_attending' => false]]);
         $this->actingAs($admin)->get(route('events.rsvps.index', $event))->assertOk()->assertSee('attending_people');
         $this->actingAs($owner)->post(route('events.meals.store', $event), ['name' => 'Fish'])->assertRedirect();
-        $this->actingAs($support)->get(route('events.rsvps.index', $event))->assertOk();
-        $this->actingAs($support)->post(route('events.meals.store', $event), ['name' => 'No access'])->assertForbidden();
         $other = User::factory()->create(['role' => 'customer', 'customer_id' => Customer::create(['name' => 'Other'])->id]);
         $this->actingAs($other)->get(route('events.rsvps.index', $event))->assertForbidden();
     }

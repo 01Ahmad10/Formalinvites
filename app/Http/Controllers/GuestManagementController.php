@@ -26,12 +26,13 @@ class GuestManagementController extends Controller
             ->when(in_array($active, ['active', 'inactive'], true), fn ($query) => $query->where('is_active', $active === 'active'))
             ->when($members === 'with', fn ($query) => $query->has('members'))
             ->when($members === 'without', fn ($query) => $query->doesntHave('members'))
-            ->orderBy('name')->get();
-        $allParties = $event->invitationParties()->withCount('members')->get();
+            ->orderBy('name')->paginate(25)->withQueryString();
+        $partyCount = $event->invitationParties()->count();
+        $memberCount = PartyMember::query()->whereHas('party', fn ($query) => $query->where('event_id', $event->id))->count();
         $capacity = $event->effectiveGuestCapacity();
         $allocated = $event->allocatedGuestCapacity();
 
-        return Inertia::render('Events/Guests/Index', ['event' => $event->load('package'), 'parties' => $parties, 'summary' => ['guest_capacity' => $capacity, 'allocated_capacity' => $allocated, 'remaining_capacity' => $capacity === null ? null : max($capacity - $allocated, 0), 'party_count' => $allParties->count(), 'member_count' => $allParties->sum('members_count')], 'filters' => ['search' => $search, 'active' => $request->string('active')->toString(), 'members' => $members], 'canManage' => $request->user()->can('update', $event)]);
+        return Inertia::render('Events/Guests/Index', ['event' => $event->load('package'), 'parties' => $parties->items(), 'pagination' => ['current_page' => $parties->currentPage(), 'last_page' => $parties->lastPage(), 'total' => $parties->total(), 'prev_page_url' => $parties->previousPageUrl(), 'next_page_url' => $parties->nextPageUrl()], 'summary' => ['guest_capacity' => $capacity, 'allocated_capacity' => $allocated, 'remaining_capacity' => $capacity === null ? null : max($capacity - $allocated, 0), 'party_count' => $partyCount, 'member_count' => $memberCount], 'filters' => ['search' => $search, 'active' => $request->string('active')->toString(), 'members' => $members], 'canManage' => $request->user()->can('update', $event)]);
     }
 
     public function storeParty(Request $request, Event $event): RedirectResponse

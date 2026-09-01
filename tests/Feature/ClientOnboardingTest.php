@@ -91,7 +91,6 @@ class ClientOnboardingTest extends TestCase
     public function test_non_admins_cannot_create_clients(): void
     {
         $payload = ['name'=>'Client','guest_capacity'=>20,'primary_name'=>'Primary','primary_email'=>'primary@example.test','primary_password'=>'safe-password'];
-        $this->actingAs(User::factory()->create(['role'=>'support']))->post(route('admin.clients.store'), $payload)->assertForbidden();
         $this->actingAs(User::factory()->create(['role'=>'customer']))->post(route('admin.clients.store'), $payload)->assertForbidden();
     }
 

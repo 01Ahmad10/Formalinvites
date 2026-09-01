@@ -99,15 +99,6 @@ class GuestManagementTest extends TestCase
         $this->actingAs($owner)->post(route('events.guests.members.store', [$event, $party]), $this->memberPayload('Owner Member'))->assertRedirect();
     }
 
-    public function test_support_is_read_only_for_guest_management(): void
-    {
-        $support = User::factory()->create(['role' => 'support']);
-        $event = $this->eventWithPackage(10);
-
-        $this->actingAs($support)->get(route('events.guests.index', $event))->assertOk();
-        $this->actingAs($support)->post(route('events.guests.store', $event), $this->partyPayload('No Access', 1))->assertForbidden();
-    }
-
     public function test_unauthorized_customer_cannot_view_or_modify_another_events_guest_list_or_party(): void
     {
         $first = Customer::create(['name' => 'First']);
@@ -201,17 +192,17 @@ class GuestManagementTest extends TestCase
         $this->assertDatabaseHas('invitation_parties', ['id' => $party->id, 'name' => 'Customer Updated Party', 'maximum_party_size' => 3]);
     }
 
-    public function test_reactivation_cannot_exceed_event_capacity_and_support_cannot_edit(): void
+    public function test_reactivation_cannot_exceed_event_capacity_and_another_customer_cannot_edit(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $support = User::factory()->create(['role' => 'support']);
+        $other = User::factory()->create(['role' => 'customer', 'customer_id' => Customer::create(['name' => 'Other'])->id]);
         $event = $this->eventWithPackage(10);
         InvitationParty::create(['event_id' => $event->id, 'name' => 'Active Family', 'maximum_party_size' => 8]);
         $inactiveParty = InvitationParty::create(['event_id' => $event->id, 'name' => 'Inactive Family', 'maximum_party_size' => 4, 'is_active' => false]);
 
         $this->actingAs($admin)->patch(route('events.guests.active', [$event, $inactiveParty]), ['is_active' => true])->assertSessionHasErrors('maximum_party_size');
         $this->assertDatabaseHas('invitation_parties', ['id' => $inactiveParty->id, 'is_active' => false]);
-        $this->actingAs($support)->put(route('events.guests.update', [$event, $inactiveParty]), $this->partyPayload('Support Attempt', 4))->assertForbidden();
+        $this->actingAs($other)->put(route('events.guests.update', [$event, $inactiveParty]), $this->partyPayload('Other Customer Attempt', 4))->assertForbidden();
     }
 
     public function test_party_details_show_only_current_rsvp_additional_guests_separately_and_format_system_dates(): void

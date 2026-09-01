@@ -20,16 +20,15 @@ use Inertia\Inertia;
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
     ]);
 });
 
 Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
-Route::get('rsvp/{token}', [PublicRsvpController::class, 'show'])->name('public.rsvp.show');
-Route::post('rsvp/{token}', [PublicRsvpController::class, 'submit'])->name('public.rsvp.submit');
-Route::get('invite/{token}', [PublicInvitationController::class, 'show'])->name('public.invitation.show');
+Route::get('rsvp/{token}', [PublicRsvpController::class, 'show'])->middleware('throttle:60,1')->name('public.rsvp.show');
+Route::post('rsvp/{token}', [PublicRsvpController::class, 'submit'])->middleware('throttle:10,1')->name('public.rsvp.submit');
+Route::get('invite/{token}', [PublicInvitationController::class, 'show'])->middleware('throttle:60,1')->name('public.invitation.show');
 
 Route::middleware('auth')->group(function () {
     Route::resource('events', EventController::class)->except('destroy');
@@ -73,8 +72,6 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::put('customers/{customer}', [AdminController::class, 'updateCustomer'])->name('customers.update');
     Route::post('customers/{customer}/second-login', [AdminController::class, 'storeSecondLogin'])->name('customers.second-login.store');
     Route::put('customer-users/{user}/password', [AdminController::class, 'resetCustomerUserPassword'])->name('customer-users.password.update');
-    Route::get('users', [AdminController::class, 'users'])->name('users.index');
-    Route::post('users', [AdminController::class, 'storeUser'])->name('users.store');
     Route::get('packages', [AdminController::class, 'packages'])->name('packages.index');
     Route::post('packages', [AdminController::class, 'storePackage'])->name('packages.store');
     Route::put('packages/{package}', [AdminController::class, 'updatePackage'])->name('packages.update');
@@ -97,7 +94,6 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
 require __DIR__.'/auth.php';

@@ -117,11 +117,9 @@ class AdminDashboardTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $customer = User::factory()->create(['role' => 'customer']);
-        $support = User::factory()->create(['role' => 'support']);
 
         $this->actingAs($admin)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page->has('analytics.kpis'));
         $this->actingAs($customer)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page->missing('analytics'));
-        $this->actingAs($support)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page->missing('analytics'));
     }
 
     private function event(string $title, mixed $date = null, ?EventPackage $package = null, ?int $capacity = null, string $status = 'draft'): Event

@@ -19,9 +19,11 @@ class PublicRsvpController extends Controller
         [$party, $publication] = $published->forToken($token);
 
         return Inertia::render('PublicRsvp', [
-            'party' => $payload->party($party, $publication),
-            'rsvp' => $payload->rsvp($party, $publication),
-            'meals' => $payload->meals($party, $publication),
+            // Use party-scoped HMAC identifiers here as well as in the invitation
+            // experience; raw internal member and meal IDs are not needed publicly.
+            'party' => $payload->invitationParty($party, $publication),
+            'rsvp' => $payload->invitationRsvp($party, $publication),
+            'meals' => $payload->invitationMeals($party, $publication),
             'closed' => $payload->closed($party, $publication),
             'confirmation' => $request->session()->get('success'),
         ]);

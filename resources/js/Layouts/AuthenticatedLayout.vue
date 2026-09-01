@@ -24,7 +24,7 @@ const navigation = computed<Item[]>(() => {
 });
 const currentPath = computed(() => new URL(page.url, 'http://inertia.local').pathname.replace(/\/$/, '') || '/');
 const active = (item: Item) => item.paths.some((path) => currentPath.value === path || currentPath.value.startsWith(`${path}/`));
-const accountLabel = computed(() => page.props.auth.user.role === 'admin' ? 'Administrator' : page.props.auth.user.role === 'support' ? 'Support' : 'Account');
+const accountLabel = computed(() => page.props.auth.user.role === 'admin' ? 'Administrator' : 'Account');
 const openMobileMenu = () => { mobileOpen.value = true; };
 const closeMobileMenu = () => { mobileOpen.value = false; };
 const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') mobileOpen.value = false; };

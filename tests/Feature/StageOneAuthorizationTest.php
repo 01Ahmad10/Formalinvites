@@ -39,10 +39,9 @@ class StageOneAuthorizationTest extends TestCase
         $this->assertCount(2, $one->managedEvents);
     }
 
-    public function test_support_and_customers_cannot_access_admin_routes(): void
+    public function test_customers_cannot_access_admin_routes(): void
     {
-        $support = User::factory()->create(['role'=>'support']); $customer = User::factory()->create(['role'=>'customer']);
-        $this->actingAs($support)->get(route('admin.customers.index'))->assertForbidden();
+        $customer = User::factory()->create(['role'=>'customer']);
         $this->actingAs($customer)->get(route('admin.customers.index'))->assertForbidden();
     }
 
@@ -57,7 +56,7 @@ class StageOneAuthorizationTest extends TestCase
         $this->assertDatabaseHas('payment_transactions', ['payment_id' => $paymentId, 'amount' => 25]);
     }
 
-    public function test_admin_searches_customers_users_events_and_payments_from_database(): void
+    public function test_admin_searches_customers_events_and_payments_from_database(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $customer = Customer::create(['name' => 'Searchable Customer', 'email' => 'contact@example.test', 'phone' => '555-0100']);
@@ -67,7 +66,6 @@ class StageOneAuthorizationTest extends TestCase
         Payment::create(['customer_id'=>$customer->id,'event_id'=>$event->id,'original_amount'=>25,'discount'=>0,'final_amount'=>25,'paid_amount'=>25,'reference'=>'SEARCH-REF','status'=>'confirmed']);
 
         $this->actingAs($admin)->get(route('admin.customers.index', ['search' => '555-0100']))->assertSee('Searchable Customer');
-        $this->actingAs($admin)->get(route('admin.users.index', ['search' => 'Searchable Customer']))->assertSee('Searchable Member');
         $this->actingAs($admin)->get(route('events.index', ['search' => 'Search Hall']))->assertSee('Searchable Celebration');
         $this->actingAs($admin)->get(route('admin.payments.index', ['search' => 'SEARCH-REF']))->assertSee('SEARCH-REF');
     }

@@ -2,12 +2,13 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import ValidationSummary from '@/Components/ValidationSummary.vue';
+import Pagination from '@/Components/UI/Pagination.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { reactive, ref } from 'vue';
 
 type Meal = { id: number; name: string; description: string | null; display_order: number; is_active: boolean };
 
-const props = defineProps<{ event: any; parties: any[]; summary: any; meals: Meal[]; filters: any; canManage: boolean; fromSetup: boolean }>();
+const props = defineProps<{ event: any; parties: any[]; summary: any; meals: Meal[]; filters: any; canManage: boolean; fromSetup: boolean; pagination?: any }>();
 const filters = reactive({ ...props.filters });
 const mealForm = useForm({ name: '', description: '', display_order: 0, from_setup: props.fromSetup });
 const editingMeal = ref<Meal | null>(null);
@@ -127,6 +128,7 @@ const updateMeal = () => {
                     </tbody>
                 </table>
             </div>
+            <Pagination :pagination="pagination" />
         </div>
     </AuthenticatedLayout>
 </template>

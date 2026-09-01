@@ -18,15 +18,14 @@ class EventPublicationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_owner_editor_and_admin_can_self_publish_but_other_customer_and_support_cannot(): void
+    public function test_owner_editor_and_admin_can_self_publish_but_other_customers_cannot(): void
     {
-        [$event, $owner, $admin, $support] = $this->eventWithUsers();
+        [$event, $owner, $admin] = $this->eventWithUsers();
         $editor = User::factory()->create(['role' => 'customer', 'customer_id' => $event->customer_id]);
         $event->members()->attach($editor, ['role' => 'editor']);
         $other = User::factory()->create(['role' => 'customer', 'customer_id' => Customer::create(['name' => 'Other'])->id]);
 
         $this->actingAs($other)->post(route('events.publication.publish', $event))->assertForbidden();
-        $this->actingAs($support)->post(route('events.publication.publish', $event))->assertForbidden();
         $this->actingAs($editor)->post(route('events.publication.publish', $event))->assertRedirect();
         $this->assertDatabaseHas('event_publications', ['event_id' => $event->id, 'version' => 1, 'published_by' => $editor->id]);
 
@@ -133,14 +132,12 @@ class EventPublicationTest extends TestCase
 
     public function test_customer_wizard_is_authorized_persists_its_steps_and_uses_trusted_design_settings(): void
     {
-        [$event, $owner, , $support] = $this->eventWithUsers(['main_date' => null, 'start_time' => null, 'template_id' => null]);
+        [$event, $owner] = $this->eventWithUsers(['main_date' => null, 'start_time' => null, 'template_id' => null]);
         $other = User::factory()->create(['role' => 'customer', 'customer_id' => Customer::create(['name' => 'Other'])->id]);
         $template = $this->template('romantic-floral', InvitationTemplateSettings::defaults());
 
         $this->actingAs($owner)->get(route('events.setup', $event))->assertInertia(fn (Assert $page) => $page->component('Events/Setup')->where('step', 1));
         $this->actingAs($other)->get(route('events.setup', $event))->assertForbidden();
-        $this->actingAs($support)->get(route('events.setup', $event))->assertOk();
-        $this->actingAs($support)->patch(route('events.setup.save', [$event, 'details']), [])->assertForbidden();
 
         $this->actingAs($owner)->patch(route('events.setup.save', [$event, 'details']), ['event_type' => 'wedding', 'title' => 'Wizard Wedding', 'host_name' => 'Maya', 'second_host_name' => 'Elias', 'description' => 'Welcome.'])->assertRedirect(route('events.setup', ['event' => $event, 'step' => 2]));
         $this->assertDatabaseHas('events', ['id' => $event->id, 'title' => 'Wizard Wedding', 'host_name' => 'Maya']);
@@ -238,11 +235,10 @@ class EventPublicationTest extends TestCase
         $customer = Customer::create(['name' => 'Customer '.uniqid()]);
         $owner = User::factory()->create(['role' => 'customer', 'customer_id' => $customer->id]);
         $admin = User::factory()->create(['role' => 'admin']);
-        $support = User::factory()->create(['role' => 'support']);
         $event = $this->eventForCustomer($customer, $overrides);
         $event->members()->attach($owner, ['role' => 'owner']);
 
-        return [$event, $owner, $admin, $support];
+        return [$event, $owner, $admin];
     }
 
     private function eventForCustomer(Customer $customer, array $overrides = []): Event

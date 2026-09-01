@@ -298,14 +298,11 @@ class InvitationTemplateTest extends TestCase
         $this->assertNotNull($otherTemplate);
     }
 
-    public function test_support_is_read_only_and_another_customer_cannot_access_event_invitation(): void
+    public function test_another_customer_cannot_access_event_invitation(): void
     {
         [$event] = $this->eventWithEditor();
-        $support = User::factory()->create(['role' => 'support']);
         $outsider = User::factory()->create(['role' => 'customer', 'customer_id' => Customer::create(['name' => 'Other'])->id]);
 
-        $this->actingAs($support)->get(route('events.invitation.edit', $event))->assertOk();
-        $this->actingAs($support)->put(route('events.invitation.update', $event), ['settings' => []])->assertForbidden();
         $this->actingAs($outsider)->get(route('events.invitation.edit', $event))->assertForbidden();
         $this->actingAs($outsider)->get(route('events.invitation.preview', $event))->assertForbidden();
     }

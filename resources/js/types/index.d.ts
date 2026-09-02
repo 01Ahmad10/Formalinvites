@@ -12,5 +12,6 @@ export type PageProps<
 > = T & {
     auth: {
         user: User;
+        customerEvents?: { id: number; title: string; is_live: boolean; is_archived: boolean }[];
     };
 };

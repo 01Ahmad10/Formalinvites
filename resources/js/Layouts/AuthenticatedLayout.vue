@@ -9,21 +9,35 @@ import formalInvitesLogo from '@/assets/brand/formalinvites-logo.webp';
 
 const page = usePage<any>();
 const mobileOpen = ref(false);
-type SidebarIconName = 'dashboard' | 'events' | 'clients' | 'payments' | 'packages' | 'coupons' | 'templates';
-type Item = { label: string; href: string; paths: string[]; icon: SidebarIconName };
+type SidebarIconName = 'dashboard' | 'events' | 'clients' | 'payments' | 'packages' | 'coupons' | 'templates' | 'families' | 'meals' | 'schedule' | 'rsvp';
+type Item = { label: string; href: string; paths: string[]; icon: SidebarIconName; exact?: boolean };
 const navigation = computed<Item[]>(() => {
-    const items: Item[] = [{ label: 'Dashboard', href: route('dashboard'), paths: ['/dashboard'], icon: 'dashboard' }, { label: 'Events', href: route('events.index'), paths: ['/events'], icon: 'events' }];
-    if (page.props.auth.user.role === 'admin') items.splice(1, 0,
+    const items: Item[] = [{ label: 'Dashboard', href: route('dashboard'), paths: ['/dashboard'], icon: 'dashboard' }];
+    if (page.props.auth.user.role === 'admin') items.push(
+        { label: 'Events', href: route('events.index'), paths: ['/events'], icon: 'events' },
         { label: 'Clients', href: route('admin.customers.index'), paths: ['/admin/customers', '/admin/clients'], icon: 'clients' },
         { label: 'Payments', href: route('admin.payments.index'), paths: ['/admin/payments'], icon: 'payments' },
         { label: 'Packages', href: route('admin.packages.index'), paths: ['/admin/packages'], icon: 'packages' },
         { label: 'Coupons', href: route('admin.coupons.index'), paths: ['/admin/coupons'], icon: 'coupons' },
         { label: 'Templates', href: route('admin.templates.index'), paths: ['/admin/templates'], icon: 'templates' },
     );
+    else {
+        const events = page.props.auth.customerEvents || [];
+        if (events.length === 1) {
+            const event = events[0];
+            items.push({ label: 'My Invitation', href: event.is_live || event.is_archived ? route('events.show', event.id) : route('events.setup', event.id), paths: [`/events/${event.id}`, `/events/${event.id}/setup`], icon: 'events', exact: true });
+            if (!event.is_archived) items.push(
+                { label: 'Families & Guests', href: route('events.guests.index', event.id), paths: [`/events/${event.id}/guests`], icon: 'families' },
+                { label: 'RSVP Responses', href: route('events.rsvps.index', event.id), paths: [`/events/${event.id}/rsvps`], icon: 'rsvp' },
+                { label: 'Meal Options', href: route('events.meals.index', event.id), paths: [`/events/${event.id}/meals`], icon: 'meals' },
+                { label: 'Schedule', href: route('events.activities.index', event.id), paths: [`/events/${event.id}/activities`], icon: 'schedule' },
+            );
+        } else items.push({ label: 'My Invitation', href: route('events.index'), paths: ['/events'], icon: 'events' });
+    }
     return items;
 });
 const currentPath = computed(() => new URL(page.url, 'http://inertia.local').pathname.replace(/\/$/, '') || '/');
-const active = (item: Item) => item.paths.some((path) => currentPath.value === path || currentPath.value.startsWith(`${path}/`));
+const active = (item: Item) => item.paths.some((path) => item.exact ? currentPath.value === path : currentPath.value === path || currentPath.value.startsWith(`${path}/`));
 const accountLabel = computed(() => page.props.auth.user.role === 'admin' ? 'Administrator' : 'Account');
 const openMobileMenu = () => { mobileOpen.value = true; };
 const closeMobileMenu = () => { mobileOpen.value = false; };

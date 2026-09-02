@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'dashboard' | 'events' | 'clients' | 'payments' | 'packages' | 'coupons' | 'templates' | 'live' | 'setup' | 'revenue' | 'collected' | 'outstanding' | 'rsvp' }>();
+defineProps<{ name: 'dashboard' | 'events' | 'clients' | 'payments' | 'packages' | 'coupons' | 'templates' | 'families' | 'meals' | 'schedule' | 'live' | 'setup' | 'revenue' | 'collected' | 'outstanding' | 'rsvp' }>();
 </script>
 
 <template>
@@ -10,6 +10,9 @@ defineProps<{ name: 'dashboard' | 'events' | 'clients' | 'payments' | 'packages'
         <template v-else-if="name === 'payments'"><path d="M4.5 6.5A2.5 2.5 0 0 1 7 4h10a2.5 2.5 0 0 1 2.5 2.5v11A2.5 2.5 0 0 1 17 20H7a2.5 2.5 0 0 1-2.5-2.5z" /><path d="M4.5 8.5h15M15.5 14.25h.01" /></template>
         <template v-else-if="name === 'packages'"><path d="m4 8 8-4 8 4-8 4zM4 8v8l8 4 8-4V8M12 12v8" /></template>
         <template v-else-if="name === 'coupons'"><path d="M4.5 5.5h15v5a2 2 0 0 0 0 4v4h-15v-4a2 2 0 0 0 0-4z" /><path d="M12 7.5v1M12 15.5v1" /></template>
+        <template v-else-if="name === 'families'"><circle cx="9" cy="8" r="2.75" /><circle cx="17" cy="10" r="2" /><path d="M3.75 19c.45-3 2.15-4.75 5.25-4.75 3.1 0 4.8 1.75 5.25 4.75M15.5 15.25c2.35.15 3.8 1.35 4.15 3.75" /></template>
+        <template v-else-if="name === 'meals'"><path d="M7 4v7M4.5 4v4a2.5 2.5 0 0 0 5 0V4M7 11v9M15.5 4v16M15.5 4c2.2 1.5 3.5 3.5 3.5 5.75H15.5" /></template>
+        <template v-else-if="name === 'schedule'"><circle cx="12" cy="12" r="8" /><path d="M12 7.5V12l3.25 2" /></template>
         <template v-else-if="name === 'live'"><path d="M4 12a8 8 0 1 0 16 0 8 8 0 0 0-16 0" /><path d="m8.5 12 2.25 2.25L15.75 9" /></template>
         <template v-else-if="name === 'setup'"><circle cx="12" cy="12" r="8" /><path d="M12 7.5V12l3 2" /></template>
         <template v-else-if="name === 'revenue'"><path d="M4.5 7A2.5 2.5 0 0 1 7 4.5h10A2.5 2.5 0 0 1 19.5 7v10A2.5 2.5 0 0 1 17 19.5H7A2.5 2.5 0 0 1 4.5 17z" /><path d="M4.5 8h15M14.5 14h2" /></template>

@@ -5,8 +5,6 @@ import PublicRsvpExperience from './PublicRsvpExperience.vue';
 const props = defineProps<{ invitation: any }>();
 const slots = useSlots();
 const registry: Record<string, any> = {
-    'elegant-classic': defineAsyncComponent(() => import('./InvitationTemplates/ElegantClassic.vue')),
-    'modern-minimal': defineAsyncComponent(() => import('./InvitationTemplates/ModernMinimal.vue')),
     'romantic-floral': defineAsyncComponent(() => import('./InvitationTemplates/PublicRomanticFloral.vue')),
     'editorial-luxury': defineAsyncComponent(() => import('./InvitationTemplates/EditorialLuxury.vue')),
     'modern-cinematic': defineAsyncComponent(() => import('./InvitationTemplates/ModernCinematic.vue')),

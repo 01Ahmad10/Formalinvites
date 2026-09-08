@@ -18,6 +18,12 @@ class DashboardController extends Controller
             return $this->customerDashboard($user);
         }
 
+        // The operational dashboard gets its own bounded, aggregate payload from
+        // AdminDashboardAnalytics. Do not hydrate the entire event catalogue here.
+        if ($user->isAdmin()) {
+            return Inertia::render('Dashboard', ['events' => [], 'isAdmin' => true, 'analytics' => $analytics->data()]);
+        }
+
         $relations = ['customer', 'package', 'payments', 'publications', 'template:id,name,component_key'];
         $events = Event::with($relations)->latest()->get();
         $events->each(function (Event $event) use ($snapshots): void {

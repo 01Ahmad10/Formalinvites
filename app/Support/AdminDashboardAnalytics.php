@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\InvitationParty;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
+use App\Models\RsvpPersonResponse;
 use Illuminate\Support\Facades\DB;
 
 class AdminDashboardAnalytics
@@ -44,12 +45,18 @@ class AdminDashboardAnalytics
         $upcomingEvents = Event::query()
             ->with(['customer', 'package', 'template:id,name'])
             ->withExists('publications')
+            ->withCount([
+                'invitationParties as active_party_count' => fn ($query) => $query->where('is_active', true),
+                'invitationParties as responded_party_count' => fn ($query) => $query->where('is_active', true)->whereHas('rsvp', fn ($rsvp) => $rsvp->whereNotNull('submitted_at')),
+            ])
             ->where('status', '!=', 'archived')
             ->whereDate('main_date', '>=', today())
             ->orderBy('main_date')
             ->orderBy('id')
             ->limit(6)
-            ->get()
+            ->get();
+        $upcomingAttendees = $this->confirmedAttendees($upcomingEvents->pluck('id')->all());
+        $upcomingEvents = $upcomingEvents
             ->map(fn (Event $event) => [
                 'id' => $event->id,
                 'title' => $event->title ?: 'Invitation setup',
@@ -59,6 +66,10 @@ class AdminDashboardAnalytics
                 'type' => $event->event_type,
                 'capacity' => $event->effectiveGuestCapacity(),
                 'status' => str($event->invitationStatus())->headline()->toString(),
+                'families' => (int) $event->active_party_count,
+                'responded_families' => (int) $event->responded_party_count,
+                'response_rate' => $event->active_party_count ? (int) round($event->responded_party_count / $event->active_party_count * 100) : 0,
+                'confirmed_attendees' => (int) ($upcomingAttendees[$event->id] ?? 0),
             ]);
 
         $attentionItems = Event::query()
@@ -70,10 +81,21 @@ class AdminDashboardAnalytics
             ->limit(5)
             ->get(['id', 'title'])
             ->map(fn (Event $event) => [
+                'kind' => 'event',
                 'id' => $event->id,
                 'title' => $event->title ?: 'Invitation setup',
                 'message' => 'Invitation setup is not complete.',
             ]);
+
+        $disabledItems = Event::query()
+            ->where('status', 'disabled')
+            ->orderBy('main_date')->orderBy('id')->limit(5)
+            ->get(['id', 'title'])
+            ->map(fn (Event $event) => ['kind' => 'event', 'id' => $event->id, 'title' => $event->title ?: 'Invitation', 'message' => 'Public invitation is disabled.']);
+        $allowanceItems = Customer::query()
+            ->whereRaw('allowed_events <= (select count(*) from events where events.customer_id = customers.id)')
+            ->orderBy('customers.name')->limit(5)->get()
+            ->map(fn (Customer $customer) => ['kind' => 'customer', 'id' => $customer->id, 'title' => $customer->name, 'message' => 'Invitation allowance has been reached.']);
 
         return [
             'kpis' => [
@@ -107,8 +129,25 @@ class AdminDashboardAnalytics
                 ->values()
                 ->all(),
             'upcoming' => $upcomingEvents,
-            'attention' => $attentionItems,
+            'attention' => $attentionItems->concat($disabledItems)->concat($allowanceItems)->take(5)->values(),
         ];
+    }
+
+    /** @return \Illuminate\Support\Collection<int, int> */
+    private function confirmedAttendees(array $eventIds)
+    {
+        if ($eventIds === []) return collect();
+
+        return RsvpPersonResponse::query()
+            ->selectRaw('invitation_parties.event_id, COUNT(*) as confirmed_attendees')
+            ->join('rsvps', 'rsvps.id', '=', 'rsvp_person_responses.rsvp_id')
+            ->join('invitation_parties', 'invitation_parties.id', '=', 'rsvps.invitation_party_id')
+            ->whereIn('invitation_parties.event_id', $eventIds)
+            ->where('invitation_parties.is_active', true)
+            ->whereNotNull('rsvps.submitted_at')
+            ->where('rsvp_person_responses.is_attending', true)
+            ->groupBy('invitation_parties.event_id')
+            ->pluck('confirmed_attendees', 'invitation_parties.event_id');
     }
 
     private function revenueTrend(): array

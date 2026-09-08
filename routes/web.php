@@ -96,8 +96,6 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('coupons', [AdminController::class, 'storeCoupon'])->name('coupons.store');
     Route::put('coupons/{coupon}', [AdminController::class, 'updateCoupon'])->name('coupons.update');
     Route::get('templates', [AdminTemplateController::class, 'index'])->name('templates.index');
-    Route::post('templates', [AdminTemplateController::class, 'store'])->name('templates.store');
-    Route::put('templates/{template}', [AdminTemplateController::class, 'update'])->name('templates.update');
     Route::patch('templates/{template}/active', [AdminTemplateController::class, 'setActive'])->name('templates.active');
 });
 

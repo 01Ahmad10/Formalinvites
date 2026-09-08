@@ -47,18 +47,14 @@ class InvitationTemplateTest extends TestCase
         $this->assertNotContains('royal-plum', Template::COMPONENT_KEYS);
     }
 
-    public function test_admin_can_manage_template_metadata_but_customers_cannot_create_templates(): void
+    public function test_admin_can_only_toggle_catalog_templates_and_customers_cannot_access_the_catalog(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $customer = User::factory()->create(['role' => 'customer', 'customer_id' => Customer::create(['name' => 'Customer'])->id]);
-        $payload = $this->templatePayload();
-
-        $this->actingAs($customer)->post(route('admin.templates.store'), $payload)->assertForbidden();
-        $this->actingAs($admin)->post(route('admin.templates.store'), $payload)->assertRedirect();
-        $template = Template::firstOrFail();
-        $this->actingAs($admin)->put(route('admin.templates.update', $template), [...$payload, 'name' => 'Updated Classic'])->assertRedirect();
+        $this->actingAs($customer)->get(route('admin.templates.index'))->assertForbidden();
+        $template = $this->template();
         $this->actingAs($admin)->patch(route('admin.templates.active', $template), ['is_active' => false])->assertRedirect();
-        $this->assertDatabaseHas('templates', ['id' => $template->id, 'name' => 'Updated Classic', 'is_active' => false]);
+        $this->assertDatabaseHas('templates', ['id' => $template->id, 'is_active' => false]);
     }
 
     public function test_authorized_event_editor_can_choose_an_active_templates_approved_palette_and_font_pair(): void

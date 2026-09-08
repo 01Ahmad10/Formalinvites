@@ -7,7 +7,6 @@ use App\Models\Event;
 use App\Models\EventActivity;
 use App\Models\EventPackage;
 use App\Models\Payment;
-use App\Models\Coupon;
 use App\Models\InvitationParty;
 use App\Models\EventMealOption;
 use App\Models\User;
@@ -33,10 +32,9 @@ class DatabaseSeeder extends Seeder
         $second = Customer::firstOrCreate(['name' => 'Olive Events'], ['contact_name' => 'Karim Nasser', 'email' => 'karim@example.test', 'is_active' => true]);
         $maya = User::firstOrCreate(['email' => 'maya@formalevites.test'], ['name' => 'Maya Haddad', 'role' => 'customer', 'customer_id' => $first->id, 'password' => $password]);
         $karim = User::firstOrCreate(['email' => 'karim@formalevites.test'], ['name' => 'Karim Nasser', 'role' => 'customer', 'customer_id' => $second->id, 'password' => $password]);
-        $packages = collect([[1,50,25],[51,100,55],[101,150,80],[151,200,100],[201,250,130],[251,300,180],[301,350,200],[351,400,280],[401,450,null],[451,500,350]])->map(fn ($row) => EventPackage::firstOrCreate(['name' => "{$row[0]}-{$row[1]} guests"], ['minimum_guests' => $row[0], 'maximum_guests' => $row[1], 'price' => $row[2], 'is_active' => true]));
-        $elegant = Template::firstOrCreate(['slug' => 'elegant-classic'], ['name' => 'Elegant Classic', 'description' => 'A timeless formal invitation layout.', 'category' => 'formal', 'component_key' => 'elegant-classic', 'supported_event_types' => ['wedding', 'engagement'], 'default_settings' => InvitationTemplateSettings::defaults(), 'is_active' => true, 'display_order' => 1]);
-        Template::firstOrCreate(['slug' => 'modern-minimal'], ['name' => 'Modern Minimal', 'description' => 'A clean, contemporary invitation layout.', 'category' => 'modern', 'component_key' => 'modern-minimal', 'default_settings' => [...InvitationTemplateSettings::defaults(), 'heading_font' => 'modern_sans', 'text_alignment' => 'left'], 'is_active' => true, 'display_order' => 2]);
+        $packages = collect([[1,50,25],[51,100,55],[101,150,80],[151,200,100],[201,250,130],[251,300,180],[301,350,200],[351,400,280],[401,450,315],[451,500,350]])->map(fn ($row) => EventPackage::firstOrCreate(['name' => "{$row[0]}-{$row[1]} guests"], ['minimum_guests' => $row[0], 'maximum_guests' => $row[1], 'price' => $row[2], 'is_active' => true]));
         Template::firstOrCreate(['slug' => 'romantic-floral'], ['name' => 'Romantic Floral', 'description' => 'A warm romantic invitation layout.', 'category' => 'romantic', 'component_key' => 'romantic-floral', 'supported_event_types' => ['wedding', 'bridal_shower', 'engagement'], 'default_settings' => [...InvitationTemplateSettings::defaults(), 'primary_color' => '#B76E79'], 'is_active' => true, 'is_customer_selectable' => true, 'display_order' => 3]);
+        $primaryTemplate = Template::where('slug', 'romantic-floral')->firstOrFail();
         // Built-in templates are available on first install. firstOrCreate deliberately
         // leaves an existing Admin activation/deactivation choice untouched on reseed.
         Template::firstOrCreate(['slug' => 'editorial-luxury'], ['name' => 'Editorial Luxury', 'description' => 'A high-fashion editorial invitation experience.', 'category' => 'editorial', 'component_key' => 'editorial-luxury', 'supported_event_types' => ['wedding', 'engagement', 'gala'], 'default_settings' => InvitationTemplateSettings::editorialLuxuryDefaults(), 'is_active' => true, 'is_customer_selectable' => true, 'display_order' => 4]);
@@ -52,7 +50,7 @@ class DatabaseSeeder extends Seeder
             'transportation_information' => 'Please arrange your own transportation.',
             'accommodation_information' => 'A guest rate is available at the nearby Cedar Hotel.',
             'guest_information' => 'Please arrive 15 minutes before the ceremony.',
-            'template_id' => $elegant->id,
+            'template_id' => $primaryTemplate->id,
         ]);
         $wedding->templateSetting()->firstOrCreate([], ['settings' => ['primary_color' => '#C9A96E']]);
         $weddingDate = $wedding->main_date->toDateString();
@@ -73,7 +71,6 @@ class DatabaseSeeder extends Seeder
         $family->members()->firstOrCreate(['first_name' => 'Emma', 'last_name' => 'Smith'], ['member_type' => 'child']);
         EventMealOption::firstOrCreate(['event_id' => $wedding->id, 'name' => 'Chicken'], ['description' => 'Roasted chicken', 'display_order' => 1, 'is_active' => true]);
         EventMealOption::firstOrCreate(['event_id' => $wedding->id, 'name' => 'Vegetarian'], ['description' => 'Vegetarian option', 'display_order' => 2, 'is_active' => true]);
-        Coupon::firstOrCreate(['code' => 'WELCOME10'], ['description' => 'Development welcome coupon', 'discount_type' => 'percentage', 'discount_value' => 10, 'is_active' => true]);
         $payment = Payment::firstOrCreate(['event_id' => $wedding->id], ['customer_id' => $first->id, 'event_package_id' => $packages[1]->id, 'original_amount' => 55, 'discount' => 5, 'discount_type' => 'fixed', 'discount_value' => 5, 'final_amount' => 50, 'paid_amount' => 0, 'status' => 'unpaid']);
         if (! $payment->transactions()->exists() && (float) $payment->paid_amount === 0.0) {
             $payment->transactions()->create(['amount' => 50, 'payment_method' => 'cash', 'reference' => 'CASH-001', 'payment_date' => now()->toDateString(), 'notes' => 'Local development payment', 'created_by' => $admin->id, 'status' => 'confirmed']);

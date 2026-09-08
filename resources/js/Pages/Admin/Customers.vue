@@ -10,7 +10,7 @@ import Pagination from '@/Components/UI/Pagination.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 
-const props = defineProps<{ customers: any[]; packages: any[]; filters: any; pagination?: any }>();
+const props = defineProps<{ customers: any[]; packages: any[]; filters: any; pagination?: any; hasCustomers: boolean }>();
 const filters = reactive({ ...props.filters });
 const showCreate = ref(false);
 const showSecondLogin = ref(false);
@@ -27,12 +27,12 @@ const statusTone = (status?: string) => status?.includes('live') || status?.incl
 <template>
     <Head title="Clients" />
     <AuthenticatedLayout>
-        <template #header><PageHeader title="Clients" subtitle="Manage customer accounts and invitation access."><template #actions><Button @click="showCreate = true">+ Add Client</Button></template></PageHeader></template>
+        <template #header><PageHeader title="Clients" subtitle="Manage client accounts and invitation access."><template #actions><Button @click="showCreate = true">+ Add Client</Button></template></PageHeader></template>
 
         <div class="fe-page fe-page-wide space-y-5">
             <form class="fe-card fe-card-muted flex flex-wrap items-center gap-2 p-3" @submit.prevent="apply"><input v-model="filters.search" placeholder="Search name, email, phone" class="w-full min-w-0 sm:w-auto sm:min-w-56"><Button type="submit">Search</Button><Button type="button" variant="ghost" @click="reset">Reset</Button></form>
             <div v-if="customers.length" class="fe-table-wrap"><table class="fe-table"><thead><tr><th>Client</th><th>Primary login</th><th>Second login</th><th>Event</th><th>Guest capacity</th><th>Invitation status</th><th>Payment status</th><th class="text-right"><span class="sr-only">Actions</span></th></tr></thead><tbody><tr v-for="customer in customers" :key="customer.id"><td class="font-semibold">{{ customer.name }}</td><td><template v-if="customer.primary_login"><span class="block">{{ customer.primary_login.name }}</span><span class="text-xs text-[color:var(--fe-text-muted)]">{{ customer.primary_login.email }}</span></template><span v-else>—</span></td><td><template v-if="customer.second_login"><span class="block">{{ customer.second_login.name }}</span><span class="text-xs text-[color:var(--fe-text-muted)]">{{ customer.second_login.email }}</span></template><span v-else>—</span></td><template v-if="customer.event"><td>{{ customer.event.title || 'Invitation setup not completed' }}</td><td>{{ customer.event.guest_capacity ? `${customer.event.guest_capacity} guests` : '—' }}</td><td><Badge :tone="statusTone(customer.event.invitation_status)">{{ customer.event.invitation_status }}</Badge></td><td><Badge :tone="statusTone(customer.event.payment_status)">{{ customer.event.payment_status }}</Badge></td></template><template v-else><td colspan="4">{{ customer.event_count ? `${customer.event_count} Events` : 'No Events' }}</td></template><td class="text-right"><Link :href="route('admin.customers.show', customer.id)" class="font-semibold text-[color:var(--fe-primary)] underline decoration-[color:var(--fe-accent)] underline-offset-4">View Client</Link></td></tr></tbody></table></div>
-            <EmptyState v-else title="No clients match your search." message="Try a different name, email address, or phone number." />
+            <EmptyState v-else-if="!hasCustomers" title="No clients yet" message="Add your first client to start managing invitations."><template #action><Button @click="showCreate = true">Add Client</Button></template></EmptyState><EmptyState v-else title="No clients match your search." message="Try a different name, email address, or phone number." />
             <Pagination :pagination="pagination" />
         </div>
 

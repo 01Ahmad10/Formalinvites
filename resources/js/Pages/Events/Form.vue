@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import InputError from '@/Components/InputError.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import EmptyState from '@/Components/UI/EmptyState.vue';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 
-const props = defineProps<{ event: any; customers: any[]; packages: any[]; types: string[]; statuses: string[]; timezones: string[]; defaultTimezone: string; isAdmin: boolean }>();
+const props = defineProps<{ event: any; customers: any[]; packages: any[]; types: string[]; statuses: string[]; timezones: string[]; defaultTimezone: string; isAdmin: boolean; requiresClient?: boolean }>();
 const dateValue = (value: string | null | undefined) => value ? value.slice(0, 10) : '';
 const timeValue = (value: string | null | undefined) => value ? value.slice(0, 5) : '';
 const form = useForm({
@@ -16,9 +17,10 @@ const submit = () => props.event ? form.put(route('events.update', props.event.i
     <Head :title="event ? 'Edit event' : 'Create event'" />
     <AuthenticatedLayout>
         <template #header><h2 class="text-xl font-semibold">{{ event ? 'Edit event' : 'Create event' }}</h2></template>
-        <form class="mx-auto max-w-4xl space-y-6 p-6" @submit.prevent="submit">
+        <div v-if="requiresClient" class="mx-auto max-w-4xl p-6"><EmptyState title="No clients available" message="Add a client before creating an event."><template #action><Link :href="route('admin.customers.index')" class="fe-btn fe-btn-primary">Add Client</Link></template></EmptyState></div>
+        <form v-else class="mx-auto max-w-4xl space-y-6 p-6" @submit.prevent="submit">
             <section class="grid gap-4 bg-white p-6 shadow sm:grid-cols-2 sm:rounded-lg">
-                <div v-if="isAdmin"><label for="customer_id" class="block text-sm font-medium">Customer</label><select id="customer_id" v-model="form.customer_id" required class="mt-1 block w-full rounded border-gray-300"><option value="">Select customer</option><option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}</option></select><InputError :message="form.errors.customer_id" class="mt-1" /></div>
+                <div v-if="isAdmin"><label for="customer_id" class="block text-sm font-medium">Client</label><select id="customer_id" v-model="form.customer_id" required class="mt-1 block w-full rounded border-gray-300"><option value="">Select client</option><option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}</option></select><InputError :message="form.errors.customer_id" class="mt-1" /></div>
                 <div><label for="title" class="block text-sm font-medium">Event title</label><input id="title" v-model="form.title" required class="mt-1 block w-full rounded border-gray-300"><InputError :message="form.errors.title" class="mt-1" /></div>
                 <div><label for="event_type" class="block text-sm font-medium">Event type</label><select id="event_type" v-model="form.event_type" class="mt-1 block w-full rounded border-gray-300"><option v-for="type in types" :key="type" :value="type">{{ type.replaceAll('_', ' ') }}</option></select><InputError :message="form.errors.event_type" class="mt-1" /></div>
                 <div><label for="host_name" class="block text-sm font-medium">Host name</label><input id="host_name" v-model="form.host_name" required class="mt-1 block w-full rounded border-gray-300"><InputError :message="form.errors.host_name" class="mt-1" /></div>

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Template extends Model
 {
-    public const COMPONENT_KEYS = ['elegant-classic', 'modern-minimal', 'romantic-floral', 'editorial-luxury', 'modern-cinematic', 'dolce-vita', 'blossom-oud', 'sacred-garden'];
+    public const COMPONENT_KEYS = ['romantic-floral', 'editorial-luxury', 'modern-cinematic', 'dolce-vita', 'blossom-oud', 'sacred-garden'];
 
     public function getDemoUrlAttribute(): ?string
     {

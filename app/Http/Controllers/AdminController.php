@@ -7,6 +7,7 @@ use App\Models\Coupon;
 use App\Models\Event;
 use App\Models\EventPackage;
 use App\Models\Payment;
+use App\Models\RsvpPersonResponse;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,20 +35,21 @@ class AdminController extends Controller
             'packages' => EventPackage::query()->where('is_active', true)->capacityOrder()->get(['id','name','minimum_guests','maximum_guests','price']),
             'filters' => ['search' => $search],
             'pagination' => $this->pagination($customers),
+            'hasCustomers' => Customer::query()->exists(),
         ]);
     }
-    public function storeCustomer(Request $r): RedirectResponse { Customer::create($r->validate(['name'=>'required|string|max:255','contact_name'=>'nullable|string|max:255','email'=>'nullable|email','phone'=>'nullable|string|max:50','is_active'=>'boolean','allowed_events'=>'nullable|integer|min:0'])); return back()->with('success','Customer created.'); }
+    public function storeCustomer(Request $r): RedirectResponse { Customer::create($r->validate(['name'=>'required|string|max:255','contact_name'=>'nullable|string|max:255','email'=>'nullable|email','phone'=>'nullable|string|max:50','is_active'=>'boolean','allowed_events'=>'nullable|integer|min:0'])); return back()->with('success','Client created.'); }
     public function updateCustomer(Request $r, Customer $customer): RedirectResponse
     {
         $data = $r->validate(['name'=>'sometimes|required|string|max:255','contact_name'=>'sometimes|nullable|string|max:255','email'=>'sometimes|nullable|email','phone'=>'sometimes|nullable|string|max:50','is_active'=>'sometimes|boolean','allowed_events'=>'sometimes|integer|min:0']);
         DB::transaction(function () use ($customer, $data): void {
             $customer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
             if (array_key_exists('allowed_events', $data) && $data['allowed_events'] < $customer->usedEvents()) {
-                throw ValidationException::withMessages(['allowed_events' => "Allowed invitations cannot be lower than this Customer's {$customer->usedEvents()} existing Events."]);
+                throw ValidationException::withMessages(['allowed_events' => "Allowed invitations cannot be lower than this Client's {$customer->usedEvents()} existing Events."]);
             }
             $customer->update($data);
         });
-        return back()->with('success','Customer updated.');
+        return back()->with('success','Client updated.');
     }
     public function storeClient(Request $request): RedirectResponse
     {
@@ -74,8 +76,27 @@ class AdminController extends Controller
 
     public function showCustomer(Customer $customer): Response
     {
-        $customer->load(['users' => fn ($query) => $query->where('role','customer')->orderBy('customer_account_role'), 'events.package', 'events.payments', 'events' => fn ($query) => $query->withCount('publications')]);
-        return Inertia::render('Admin/ClientDetails', ['customer' => $customer, 'allowance' => $customer->allowanceSummary(), 'customerUsers' => $customer->users, 'events' => $customer->events->map(fn (Event $event) => ['id'=>$event->id,'title'=>$event->title,'invitation_status'=>$event->invitationStatus(),'guest_capacity'=>$event->effectiveGuestCapacity(),'package'=>$event->package?->only(['name','minimum_guests','maximum_guests','price']),'finance'=>['has_record'=>$event->payments->isNotEmpty(),'final_amount'=>(float) $event->payments->sum('final_amount'),'paid_amount'=>(float) $event->payments->sum('paid_amount'),'remaining_amount'=>$event->payments->sum(fn ($payment) => $payment->remainingAmount())]])->values(), 'canAddSecondLogin' => $customer->users->count() < 2]);
+        $customer->load([
+            'users' => fn ($query) => $query->where('role','customer')->orderBy('customer_account_role'),
+            'events.package',
+            'events.payments',
+            'events' => fn ($query) => $query
+                ->withCount([
+                    'publications',
+                    'invitationParties as families_count' => fn ($parties) => $parties->where('is_active', true),
+                    'invitationParties as responded_families_count' => fn ($parties) => $parties->where('is_active', true)->whereHas('rsvp', fn ($rsvp) => $rsvp->whereNotNull('submitted_at')),
+                ])
+                ->withSum(['invitationParties as allocated_capacity' => fn ($parties) => $parties->where('is_active', true)], 'maximum_party_size')
+                ->orderBy('main_date')->orderBy('id'),
+        ]);
+        $attendees = RsvpPersonResponse::query()
+            ->selectRaw('invitation_parties.event_id, COUNT(*) as confirmed_attendees')
+            ->join('rsvps', 'rsvps.id', '=', 'rsvp_person_responses.rsvp_id')
+            ->join('invitation_parties', 'invitation_parties.id', '=', 'rsvps.invitation_party_id')
+            ->whereIn('invitation_parties.event_id', $customer->events->pluck('id'))
+            ->where('invitation_parties.is_active', true)->whereNotNull('rsvps.submitted_at')->where('rsvp_person_responses.is_attending', true)
+            ->groupBy('invitation_parties.event_id')->pluck('confirmed_attendees', 'invitation_parties.event_id');
+        return Inertia::render('Admin/ClientDetails', ['customer' => $customer, 'allowance' => $customer->allowanceSummary(), 'customerUsers' => $customer->users, 'events' => $customer->events->map(fn (Event $event) => ['id'=>$event->id,'title'=>$event->title,'event_type'=>$event->event_type,'date'=>$event->main_date?->format('M j, Y'),'invitation_status'=>$event->invitationStatus(),'guest_capacity'=>$event->effectiveGuestCapacity(),'allocated_capacity'=>(int) ($event->allocated_capacity ?? 0),'families_count'=>(int) $event->families_count,'responded_families_count'=>(int) $event->responded_families_count,'confirmed_attendees'=>(int) ($attendees[$event->id] ?? 0),'package'=>$event->package?->only(['name','minimum_guests','maximum_guests','price']),'finance'=>['has_record'=>$event->payments->isNotEmpty(),'final_amount'=>(float) $event->payments->sum('final_amount'),'paid_amount'=>(float) $event->payments->sum('paid_amount'),'remaining_amount'=>$event->payments->sum(fn ($payment) => $payment->remainingAmount())]])->values(), 'canAddSecondLogin' => $customer->users->count() < 2]);
     }
 
     public function storeSecondLogin(Request $request, Customer $customer): RedirectResponse
@@ -154,7 +175,9 @@ class AdminController extends Controller
             ->withCount('payments')->orderBy('code')->get(['id', 'code', 'discount_type', 'discount_value', 'usage_limit'])
             ->filter(fn (Coupon $coupon) => $coupon->usage_limit === null || $coupon->payments_count < $coupon->usage_limit)->values();
 
-        return Inertia::render('Admin/Payments', ['payments' => $payments->items(), 'summary' => $summary, 'customers' => Customer::where('is_active', true)->orderBy('name')->get(['id', 'name']), 'events' => Event::with('package:id,name,price')->latest()->get(['id', 'customer_id', 'title', 'event_package_id']), 'coupons' => $availableCoupons, 'filters' => ['search' => $search, 'status' => $status, 'customer_id' => $customerId ?: ''], 'pagination' => $this->pagination($payments)]);
+        $customers = Customer::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+
+        return Inertia::render('Admin/Payments', ['payments' => $payments->items(), 'summary' => $summary, 'customers' => $customers, 'events' => Event::with('package:id,name,price')->latest()->get(['id', 'customer_id', 'title', 'event_package_id']), 'coupons' => $availableCoupons, 'filters' => ['search' => $search, 'status' => $status, 'customer_id' => $customerId ?: ''], 'pagination' => $this->pagination($payments), 'hasClients' => $customers->isNotEmpty()]);
     }
 
     public function storePayment(Request $request): RedirectResponse

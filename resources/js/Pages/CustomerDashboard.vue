@@ -11,7 +11,7 @@ type Invitation = {
     id: number;
     title: string;
     template_name: string | null;
-    status: 'setup' | 'live' | 'archived';
+    status: 'setup' | 'live' | 'disabled' | 'archived';
     date: string | null;
     guest_capacity: number | null;
     allocated_capacity: number;
@@ -69,7 +69,7 @@ const greeting = () => user.name.split(' ')[0] || 'there';
 
                 <section class="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,.8fr)]">
                     <Card><p class="fe-page-eyebrow">Next action</p><h2 class="fe-section-title mt-2">{{ singleInvitation.next_action.title }}</h2><p class="fe-section-copy mt-2">{{ singleInvitation.next_action.description }}</p><Link :href="singleInvitation.next_action.url" class="fe-btn fe-btn-primary mt-5">{{ singleInvitation.next_action.label }}</Link></Card>
-                    <Card muted><p class="fe-page-eyebrow">Invitation status</p><p class="fe-section-title mt-2">{{ invitationStatus(singleInvitation.status) }}</p><p class="fe-section-copy mt-2">{{ singleInvitation.status === 'setup' ? 'Complete the five-step invitation journey when you are ready.' : singleInvitation.status === 'live' ? 'Your invitation is ready to share and guest responses are being tracked.' : 'This invitation is archived and cannot be changed.' }}</p></Card>
+                    <Card muted><p class="fe-page-eyebrow">Invitation status</p><p class="fe-section-title mt-2">{{ invitationStatus(singleInvitation.status) }}</p><p class="fe-section-copy mt-2">{{ singleInvitation.status === 'setup' ? 'Complete the five-step invitation journey when you are ready.' : singleInvitation.status === 'live' ? 'Your invitation is ready to share and guest responses are being tracked.' : singleInvitation.status === 'disabled' ? 'This invitation is temporarily unavailable to guests. Contact your Admin if this was unexpected.' : 'This invitation is archived and cannot be changed.' }}</p></Card>
                 </section>
 
                 <section v-if="singleInvitation.status !== 'archived'" aria-label="Invitation quick links">

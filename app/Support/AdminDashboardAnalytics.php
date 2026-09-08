@@ -16,10 +16,9 @@ class AdminDashboardAnalytics
         $events = Event::query();
         $eventCount = (clone $events)->count();
         $archivedEventCount = (clone $events)->where('status', 'archived')->count();
-        $liveEventCount = (clone $events)
-            ->where('status', '!=', 'archived')
-            ->whereHas('publications')
-            ->count();
+        $liveEventCount = (clone $events)->where('status', 'published')->count();
+        $disabledEventCount = (clone $events)->where('status', 'disabled')->count();
+        $setupEventCount = $eventCount - $liveEventCount - $disabledEventCount - $archivedEventCount;
 
         $confirmedByPayment = PaymentTransaction::query()
             ->selectRaw('payment_id, SUM(amount) as confirmed_amount')
@@ -59,7 +58,7 @@ class AdminDashboardAnalytics
                 'date' => $event->main_date?->format('M j, Y'),
                 'type' => $event->event_type,
                 'capacity' => $event->effectiveGuestCapacity(),
-                'status' => $event->publications_exists ? 'Live' : 'Setup',
+                'status' => str($event->invitationStatus())->headline()->toString(),
             ]);
 
         $attentionItems = Event::query()
@@ -81,18 +80,19 @@ class AdminDashboardAnalytics
                 'clients' => Customer::count(),
                 'events' => $eventCount,
                 'live' => $liveEventCount,
-                'setup' => $eventCount - $liveEventCount - $archivedEventCount,
+                'setup' => $setupEventCount,
                 'revenue' => $revenue,
                 'collected' => $collected,
                 'outstanding' => $outstanding,
                 'rsvp_rate' => $activePartyCount ? (int) round($respondedPartyCount / $activePartyCount * 100) : 0,
             ],
             'revenue_trend' => $this->revenueTrend(),
-            'event_status' => $this->breakdown([
+            'event_status' => $this->breakdown(array_filter([
                 'Live' => $liveEventCount,
-                'Setup' => $eventCount - $liveEventCount - $archivedEventCount,
+                'Setup' => $setupEventCount,
+                'Disabled' => $disabledEventCount,
                 'Archived' => $archivedEventCount,
-            ], $eventCount),
+            ], fn (int $count): bool => $count > 0), $eventCount),
             'rsvp_breakdown' => $this->rsvpBreakdown($activePartyCount, $respondedPartyCount),
             'events_by_type' => Event::query()
                 ->select('event_type')

@@ -35,7 +35,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'customerEvents' => fn () => $request->user()?->role === 'customer'
                     ? $request->user()->managedEvents()->select(['events.id', 'events.title', 'events.status'])->withExists('publications')->orderBy('events.main_date')->orderBy('events.id')->get()
-                        ->map(fn ($event) => ['id' => $event->id, 'title' => $event->title ?: 'Your invitation', 'is_live' => $event->status !== 'archived' && $event->publications_exists, 'is_archived' => $event->status === 'archived'])
+                        ->map(fn ($event) => ['id' => $event->id, 'title' => $event->title ?: 'Your invitation', 'is_live' => $event->isLive(), 'is_disabled' => $event->isDisabled(), 'is_archived' => $event->isArchived()])
                         ->values()
                     : [],
             ],

@@ -36,12 +36,23 @@ class AdminController extends Controller
             'pagination' => $this->pagination($customers),
         ]);
     }
-    public function storeCustomer(Request $r): RedirectResponse { Customer::create($r->validate(['name'=>'required|string|max:255','contact_name'=>'nullable|string|max:255','email'=>'nullable|email','phone'=>'nullable|string|max:50','is_active'=>'boolean'])); return back()->with('success','Customer created.'); }
-    public function updateCustomer(Request $r, Customer $customer): RedirectResponse { $customer->update($r->validate(['name'=>'required|string|max:255','contact_name'=>'nullable|string|max:255','email'=>'nullable|email','phone'=>'nullable|string|max:50','is_active'=>'boolean'])); return back()->with('success','Customer updated.'); }
+    public function storeCustomer(Request $r): RedirectResponse { Customer::create($r->validate(['name'=>'required|string|max:255','contact_name'=>'nullable|string|max:255','email'=>'nullable|email','phone'=>'nullable|string|max:50','is_active'=>'boolean','allowed_events'=>'nullable|integer|min:0'])); return back()->with('success','Customer created.'); }
+    public function updateCustomer(Request $r, Customer $customer): RedirectResponse
+    {
+        $data = $r->validate(['name'=>'sometimes|required|string|max:255','contact_name'=>'sometimes|nullable|string|max:255','email'=>'sometimes|nullable|email','phone'=>'sometimes|nullable|string|max:50','is_active'=>'sometimes|boolean','allowed_events'=>'sometimes|integer|min:0']);
+        DB::transaction(function () use ($customer, $data): void {
+            $customer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
+            if (array_key_exists('allowed_events', $data) && $data['allowed_events'] < $customer->usedEvents()) {
+                throw ValidationException::withMessages(['allowed_events' => "Allowed invitations cannot be lower than this Customer's {$customer->usedEvents()} existing Events."]);
+            }
+            $customer->update($data);
+        });
+        return back()->with('success','Customer updated.');
+    }
     public function storeClient(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name' => ['required','string','max:255'], 'phone' => ['nullable','string','max:50'], 'guest_capacity' => ['required','integer','min:1'],
+            'name' => ['required','string','max:255'], 'phone' => ['nullable','string','max:50'], 'guest_capacity' => ['required','integer','min:1'], 'allowed_events' => ['required','integer','min:1'],
             'primary_name' => ['required','string','max:255'], 'primary_email' => ['required','email','unique:users,email'], 'primary_password' => ['required','string','min:8'],
             'secondary_name' => ['nullable','string','max:255'], 'secondary_email' => ['nullable','email','unique:users,email'], 'secondary_password' => ['nullable','string','min:8'],
         ]);
@@ -51,7 +62,7 @@ class AdminController extends Controller
 
         DB::transaction(function () use ($data, $secondary, $package): void {
             // These legacy Customer fields remain populated without making Admin enter the same contact details twice.
-            $customer = Customer::create(['name'=>$data['name'],'contact_name'=>$data['primary_name'],'email'=>$data['primary_email'],'phone'=>$data['phone'] ?? null,'is_active'=>true]);
+            $customer = Customer::create(['name'=>$data['name'],'contact_name'=>$data['primary_name'],'email'=>$data['primary_email'],'phone'=>$data['phone'] ?? null,'is_active'=>true,'allowed_events'=>$data['allowed_events']]);
             $event = $customer->events()->create(['event_package_id'=>$package->id, 'guest_capacity'=>$data['guest_capacity'], 'event_timezone'=>config('app.timezone'), 'status'=>'draft']);
             $primary = User::create(['customer_id'=>$customer->id,'name'=>$data['primary_name'],'email'=>$data['primary_email'],'password'=>Hash::make($data['primary_password']),'role'=>'customer','customer_account_role'=>'primary']);
             $event->members()->attach($primary->id, ['role'=>'owner']);
@@ -64,7 +75,7 @@ class AdminController extends Controller
     public function showCustomer(Customer $customer): Response
     {
         $customer->load(['users' => fn ($query) => $query->where('role','customer')->orderBy('customer_account_role'), 'events.package', 'events.payments', 'events' => fn ($query) => $query->withCount('publications')]);
-        return Inertia::render('Admin/ClientDetails', ['customer' => $customer, 'customerUsers' => $customer->users, 'events' => $customer->events->map(fn (Event $event) => ['id'=>$event->id,'title'=>$event->title,'invitation_status'=>$event->status === 'archived' ? 'Archived' : ($event->publications_count ? 'Active' : 'Setup'),'guest_capacity'=>$event->effectiveGuestCapacity(),'package'=>$event->package?->only(['name','minimum_guests','maximum_guests','price']),'finance'=>['has_record'=>$event->payments->isNotEmpty(),'final_amount'=>(float) $event->payments->sum('final_amount'),'paid_amount'=>(float) $event->payments->sum('paid_amount'),'remaining_amount'=>$event->payments->sum(fn ($payment) => $payment->remainingAmount())]])->values(), 'canAddSecondLogin' => $customer->users->count() < 2]);
+        return Inertia::render('Admin/ClientDetails', ['customer' => $customer, 'allowance' => $customer->allowanceSummary(), 'customerUsers' => $customer->users, 'events' => $customer->events->map(fn (Event $event) => ['id'=>$event->id,'title'=>$event->title,'invitation_status'=>$event->invitationStatus(),'guest_capacity'=>$event->effectiveGuestCapacity(),'package'=>$event->package?->only(['name','minimum_guests','maximum_guests','price']),'finance'=>['has_record'=>$event->payments->isNotEmpty(),'final_amount'=>(float) $event->payments->sum('final_amount'),'paid_amount'=>(float) $event->payments->sum('paid_amount'),'remaining_amount'=>$event->payments->sum(fn ($payment) => $payment->remainingAmount())]])->values(), 'canAddSecondLogin' => $customer->users->count() < 2]);
     }
 
     public function storeSecondLogin(Request $request, Customer $customer): RedirectResponse
@@ -116,7 +127,8 @@ class AdminController extends Controller
             'primary_login' => $primary ? ['name' => $primary->name, 'email' => $primary->email] : null,
             'second_login' => $secondary ? ['name' => $secondary->name, 'email' => $secondary->email] : null,
             'event_count' => $events->count(),
-            'event' => $event ? ['title' => $event->title, 'guest_capacity' => $event->effectiveGuestCapacity(), 'invitation_status' => $event->status === 'archived' ? 'Archived' : ($event->publications_count ? 'Active' : 'Setup'), 'payment_status' => match ($payment?->status) { 'paid' => 'Paid', 'partially_paid' => 'Partially Paid', default => 'Unpaid' }] : null,
+            'allowance' => $customer->allowanceSummary(),
+            'event' => $event ? ['title' => $event->title, 'guest_capacity' => $event->effectiveGuestCapacity(), 'invitation_status' => $event->invitationStatus(), 'payment_status' => match ($payment?->status) { 'paid' => 'Paid', 'partially_paid' => 'Partially Paid', default => 'Unpaid' }] : null,
         ];
     }
     public function packages(Request $request): Response { $search = $request->string('search')->trim()->toString(); $active = $request->string('active')->toString(); $packages = EventPackage::query()->when($search, fn ($query) => $query->where('name', 'like', "%{$search}%"))->when(in_array($active, ['active', 'inactive'], true), fn ($query) => $query->where('is_active', $active === 'active'))->capacityOrder()->get(); return Inertia::render('Admin/Packages', ['packages'=>$packages, 'filters' => ['search' => $search, 'active' => $active]]); }

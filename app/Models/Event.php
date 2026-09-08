@@ -13,7 +13,10 @@ class Event extends Model
 {
     use HasFactory;
     public const TYPES = ['wedding', 'engagement', 'bridal_shower', 'birthday', 'graduation', 'baptism', 'communion'];
-    public const STATUSES = ['draft', 'submitted', 'under_review', 'changes_requested', 'approved', 'published', 'archived'];
+    // "published" remains the technical storage value for the product-facing
+    // Live state so existing immutable publications do not need rewriting.
+    public const STATUSES = ['draft', 'published', 'disabled', 'archived'];
+    public const LEGACY_STATUSES = ['submitted', 'under_review', 'changes_requested', 'approved'];
     protected $fillable = ['customer_id', 'event_package_id', 'guest_capacity', 'template_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'end_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'event_timezone', 'dress_code', 'parking_information', 'transportation_information', 'accommodation_information', 'guest_information', 'status', 'submitted_snapshot_hash', 'submitted_at', 'approved_snapshot_hash', 'approved_at', 'approved_by', 'review_note'];
     protected function casts(): array { return ['guest_capacity' => 'integer', 'main_date' => 'date', 'end_date' => 'date', 'rsvp_deadline' => 'date', 'submitted_at' => 'immutable_datetime', 'approved_at' => 'immutable_datetime']; }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
@@ -61,4 +64,19 @@ class Event extends Model
 
     /** Exact purchased capacity takes precedence; legacy Events use their Package maximum. */
     public function effectiveGuestCapacity(): ?int { return $this->guest_capacity ?? $this->package?->maximum_guests; }
+
+    public function isLive(): bool { return $this->status === 'published'; }
+    public function isDisabled(): bool { return $this->status === 'disabled'; }
+    public function isArchived(): bool { return $this->status === 'archived'; }
+
+    /** Product-facing status; approval-era values intentionally present as setup. */
+    public function invitationStatus(): string
+    {
+        return match (true) {
+            $this->isArchived() => 'archived',
+            $this->isDisabled() => 'disabled',
+            $this->isLive() => 'live',
+            default => 'setup',
+        };
+    }
 }

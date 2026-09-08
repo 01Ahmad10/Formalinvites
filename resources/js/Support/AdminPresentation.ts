@@ -1,5 +1,6 @@
 export const invitationStatus = (status?: string | null) => {
     if (status === 'archived') return 'Archived';
+    if (status === 'disabled') return 'Disabled';
     if (status === 'live' || status === 'active' || status === 'published' || status === 'live_unpublished_changes') return 'Live';
 
     return 'Setup';
@@ -13,7 +14,7 @@ export const paymentStatus = (status?: string | null) => ({
 
 export const statusTone = (status?: string | null) => status === 'paid' || status === 'live' || status === 'active'
     ? 'success'
-    : status === 'archived' || status === 'inactive'
+    : status === 'archived' || status === 'inactive' || status === 'disabled'
         ? 'neutral'
         : 'warning';
 

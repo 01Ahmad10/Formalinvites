@@ -14,6 +14,20 @@ class EventPublicationService
 
     public function activateLocked(Event $event, User $user): EventPublication
     {
+        $publication = $this->createVersionLocked($event, $user);
+        $event->update(['status' => 'published']);
+
+        return $publication;
+    }
+
+    /** Saves a changed live or disabled working copy without changing availability. */
+    public function publishIfActiveLocked(Event $event, User $user): ?EventPublication
+    {
+        return $event->publications()->exists() ? $this->createVersionLocked($event, $user) : null;
+    }
+
+    private function createVersionLocked(Event $event, User $user): EventPublication
+    {
         $this->ensureReady($event);
         $snapshot = $this->snapshots->build($event);
         $hash = $this->snapshots->hashSnapshot($snapshot);
@@ -28,14 +42,7 @@ class EventPublicationService
             'published_by' => $user->id,
             'published_at' => now(),
         ]);
-        $event->update(['status' => 'published']);
-
         return $publication;
-    }
-
-    public function publishIfActiveLocked(Event $event, User $user): ?EventPublication
-    {
-        return $event->publications()->exists() ? $this->activateLocked($event, $user) : null;
     }
 
     private function ensureReady(Event $event): void

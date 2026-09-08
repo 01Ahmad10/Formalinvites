@@ -20,7 +20,8 @@ class EventPublicationController extends Controller
 
         DB::transaction(function () use ($event, $request, $publications): void {
             $event = Event::query()->lockForUpdate()->findOrFail($event->id);
-            abort_if($event->status === 'archived', 422, 'Archived Events cannot be published.');
+            abort_if($event->isArchived(), 422, 'Archived Events cannot be published.');
+            abort_if($event->isDisabled(), 422, 'Disabled invitations can only be enabled by an Admin.');
             $latest = $event->publications()->orderByDesc('version')->lockForUpdate()->first();
             $publication = $publications->activateLocked($event, $request->user());
             if ($latest && $publication->is($latest)) {
@@ -29,6 +30,24 @@ class EventPublicationController extends Controller
         });
 
         return back()->with('success', 'Invitation published successfully.');
+    }
+
+    public function disable(Request $request, Event $event): RedirectResponse
+    {
+        $this->admin($request);
+        abort_unless($event->isLive() && $event->publications()->exists(), 422, 'Only Live invitations can be disabled.');
+        $event->update(['status' => 'disabled']);
+
+        return back()->with('success', 'The invitation is disabled. Public invitation and RSVP links are unavailable.');
+    }
+
+    public function enable(Request $request, Event $event): RedirectResponse
+    {
+        $this->admin($request);
+        abort_unless($event->isDisabled() && $event->publications()->exists(), 422, 'Only disabled invitations with a publication can be enabled.');
+        $event->update(['status' => 'published']);
+
+        return back()->with('success', 'The invitation is Live again.');
     }
 
     public function archive(Request $request, Event $event): RedirectResponse

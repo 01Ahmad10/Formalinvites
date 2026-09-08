@@ -65,6 +65,7 @@ class EventInvitationController extends Controller
         $settings = InvitationTemplateSettings::validateEventSettings($data['settings'] ?? [], $template?->default_settings);
         DB::transaction(function () use ($event, $template, $request, $settings, $publications): void {
             $locked = Event::query()->lockForUpdate()->findOrFail($event->id);
+            abort_if($locked->isArchived(), 422, 'Archived Events cannot be changed.');
             $locked->update(['template_id' => $template?->id]);
             if ($request->has('settings')) $locked->templateSetting()->updateOrCreate([], ['settings' => $settings]);
             $publications->publishIfActiveLocked($locked, $request->user());

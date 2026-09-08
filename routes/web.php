@@ -54,6 +54,8 @@ Route::middleware('auth')->group(function () {
     Route::get('events/{event}/builder', [EventBuilderController::class, 'show'])->name('events.builder');
     Route::put('events/{event}/builder', [EventBuilderController::class, 'update'])->name('events.builder.update');
     Route::post('events/{event}/publication/publish', [EventPublicationController::class, 'publish'])->name('events.publication.publish');
+    Route::patch('events/{event}/publication/disable', [EventPublicationController::class, 'disable'])->name('events.publication.disable');
+    Route::patch('events/{event}/publication/enable', [EventPublicationController::class, 'enable'])->name('events.publication.enable');
     Route::patch('events/{event}/publication/archive', [EventPublicationController::class, 'archive'])->name('events.publication.archive');
     Route::get('events/{event}/guests', [GuestManagementController::class, 'index'])->name('events.guests.index');
     Route::post('events/{event}/guests', [GuestManagementController::class, 'storeParty'])->name('events.guests.store');

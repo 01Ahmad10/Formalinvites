@@ -187,6 +187,7 @@ class RsvpTest extends TestCase
 
     private function publish(Event $event): EventPublication
     {
+        $event->update(['status' => 'published']);
         $builder = app(InvitationPublicationSnapshotBuilder::class);
         $snapshot = $builder->build($event->fresh());
         return EventPublication::create(['event_id' => $event->id, 'version' => $event->publications()->count() + 1, 'snapshot' => $snapshot, 'snapshot_hash' => $builder->hashSnapshot($snapshot), 'published_at' => now()]);

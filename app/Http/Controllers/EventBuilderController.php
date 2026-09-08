@@ -24,7 +24,7 @@ class EventBuilderController extends Controller
     {
         $this->view($request, $event);
 
-        if ($event->status === 'archived') return to_route('events.show', $event);
+        if ($event->isArchived()) return to_route('events.show', $event);
         if (! $this->isReadyForPersonalization($event)) return to_route('events.setup', $event);
 
         $event->load(['template', 'templateSetting', 'invitationContent']);
@@ -54,7 +54,7 @@ class EventBuilderController extends Controller
                 'meals' => route('events.meals.index', $event),
                 'guests' => route('events.guests.index', $event),
             ],
-            'isLive' => $event->publications()->exists(),
+            'isLive' => $event->isLive(),
         ]);
     }
 
@@ -65,7 +65,7 @@ class EventBuilderController extends Controller
 
         DB::transaction(function () use ($event, $data, $request, $publications): void {
             $locked = Event::query()->lockForUpdate()->findOrFail($event->id);
-            abort_if($locked->status === 'archived', 422, 'Archived Events cannot be changed.');
+            abort_if($locked->isArchived(), 422, 'Archived Events cannot be changed.');
             $template = Template::findOrFail($data['template_id']);
             $this->assertTemplateIsSelectable($request, $locked, $template, $data['event_type']);
             $settings = InvitationTemplateSettings::validateEventSettings($data['settings'] ?? [], $template->default_settings);

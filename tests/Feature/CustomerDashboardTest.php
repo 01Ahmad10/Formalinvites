@@ -23,6 +23,7 @@ class CustomerDashboardTest extends TestCase
         $package = EventPackage::create(['name' => '250 Guests', 'minimum_guests' => 201, 'maximum_guests' => 250, 'price' => 100, 'is_active' => true]);
         $event = $this->event($customer, $package, 230, 'My Wedding');
         $event->members()->attach($user, ['role' => 'owner']);
+        $event->update(['status' => 'published']);
         EventPublication::create(['event_id' => $event->id, 'version' => 1, 'snapshot' => [], 'snapshot_hash' => str_repeat('a', 64), 'published_at' => now()]);
 
         $attending = InvitationParty::create(['event_id' => $event->id, 'name' => 'Attending Family', 'maximum_party_size' => 4]);

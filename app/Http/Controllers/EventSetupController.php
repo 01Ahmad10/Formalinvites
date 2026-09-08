@@ -45,7 +45,7 @@ class EventSetupController extends Controller
             'workflow' => [
                 'live_version' => $live?->version,
                 'unpublished_changes' => $live && ! hash_equals($live->snapshot_hash, $currentHash),
-                'archived' => $event->status === 'archived',
+                'archived' => $event->isArchived(),
                 'can_manage' => $request->user()->can('update', $event),
             ],
             'steps' => [
@@ -72,7 +72,7 @@ class EventSetupController extends Controller
 
         DB::transaction(function () use ($event, $step, $data, $request, $publications): void {
             $locked = Event::query()->lockForUpdate()->findOrFail($event->id);
-            abort_if($locked->status === 'archived', 422, 'Archived Events cannot be changed.');
+            abort_if($locked->isArchived(), 422, 'Archived Events cannot be changed.');
             if ($step === 'design') $this->design($request, $locked);
             else $locked->update($data);
             $publications->publishIfActiveLocked($locked, $request->user());

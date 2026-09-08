@@ -77,7 +77,7 @@ class EventPublicationTest extends TestCase
         $meal->update(['name' => 'Working Fish', 'is_active' => false]);
 
         $this->actingAs($owner)->get(route('events.show', $event))->assertInertia(fn (Assert $page) => $page
-            ->where('workflow.invitation_status', 'live_unpublished_changes')
+            ->where('workflow.invitation_status', 'live')
             ->where('workflow.unpublished_changes', true)
             ->where('workflow.can_publish', true)
         );

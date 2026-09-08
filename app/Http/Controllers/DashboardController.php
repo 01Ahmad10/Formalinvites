@@ -25,7 +25,7 @@ class DashboardController extends Controller
             $dirty = $live && ! hash_equals($live->snapshot_hash, $snapshots->hash($event));
             $event->setAttribute('live_version', $live?->version);
             $event->setAttribute('unpublished_changes', (bool) $dirty);
-            $event->setAttribute('invitation_status', $event->status === 'archived' ? 'archived' : (! $live ? 'setup' : ($dirty ? 'live_unpublished_changes' : 'live')));
+            $event->setAttribute('invitation_status', $event->invitationStatus());
             $event->unsetRelation('publications');
         });
         return Inertia::render('Dashboard', ['events' => $events, 'isAdmin' => true, 'analytics' => $analytics->data()]);
@@ -55,8 +55,9 @@ class DashboardController extends Controller
             ->where('rsvp_person_responses.is_attending', true)
             ->groupBy('invitation_parties.event_id')
             ->pluck('confirmed_attendees', 'invitation_parties.event_id');
+        $customer = $user->customer()->withCount('events')->first();
         $invitations = $events->map(function (Event $event) use ($attendees): array {
-            $status = $event->status === 'archived' ? 'archived' : ($event->publications_exists ? 'live' : 'setup');
+            $status = $event->invitationStatus();
             $families = (int) $event->active_party_count;
             $responded = (int) $event->responded_party_count;
 
@@ -72,8 +73,8 @@ class DashboardController extends Controller
                 'responded_families' => $responded,
                 'confirmed_attendees' => (int) ($attendees[$event->id] ?? 0),
                 'response_rate' => $families ? (int) round($responded / $families * 100) : 0,
-                'invitation_url' => $status === 'live' ? route('events.builder', $event) : route('events.setup', $event),
-                'manage_url' => $status === 'archived' ? route('events.show', $event) : ($status === 'live' ? route('events.builder', $event) : route('events.setup', $event)),
+                'invitation_url' => in_array($status, ['live', 'disabled'], true) ? route('events.builder', $event) : route('events.setup', $event),
+                'manage_url' => $status === 'archived' ? route('events.show', $event) : (in_array($status, ['live', 'disabled'], true) ? route('events.builder', $event) : route('events.setup', $event)),
                 'preview_url' => route('events.invitation.preview', $event),
                 'view_url' => $status === 'live' ? route('events.invitation.live-preview', $event) : null,
                 'guests_url' => route('events.guests.index', $event),
@@ -82,16 +83,21 @@ class DashboardController extends Controller
                 'schedule_url' => route('events.activities.index', $event),
                 'next_action' => $status === 'archived'
                     ? ['title' => 'Your invitation is archived', 'description' => 'You can review this invitation, but it can no longer be changed.', 'label' => 'View Invitation', 'url' => route('events.show', $event)]
+                    : ($status === 'disabled'
+                    ? ['title' => 'Your invitation is disabled', 'description' => 'An Admin has temporarily made the public invitation unavailable.', 'label' => 'Edit Invitation', 'url' => route('events.builder', $event)]
                     : ($status === 'setup'
                     ? ['title' => 'Complete your invitation', 'description' => 'Your invitation is waiting for a few final details.', 'label' => 'Continue Setup', 'url' => route('events.setup', $event)]
                     : ($families === 0
                         ? ['title' => 'Add your first family', 'description' => 'Start inviting guests when you are ready.', 'label' => 'Manage Families & Guests', 'url' => route('events.guests.index', $event)]
                         : ($responded === 0
                             ? ['title' => 'Track guest responses', 'description' => 'Responses will appear here after your guests reply.', 'label' => 'View RSVP Responses', 'url' => route('events.rsvps.index', $event)]
-                            : ['title' => 'Keep your invitation up to date', 'description' => 'Review your invitation and guest responses as plans come together.', 'label' => 'Edit Invitation', 'url' => route('events.builder', $event)]))),
+                            : ['title' => 'Keep your invitation up to date', 'description' => 'Review your invitation and guest responses as plans come together.', 'label' => 'Edit Invitation', 'url' => route('events.builder', $event)])))),
             ];
         })->values();
 
-        return Inertia::render('CustomerDashboard', ['invitations' => $invitations]);
+        return Inertia::render('CustomerDashboard', [
+            'invitations' => $invitations,
+            'allowance' => $customer?->allowanceSummary() ?? ['allowed_events' => 0, 'used_events' => 0, 'remaining_events' => 0, 'can_create_event' => false],
+        ]);
     }
 }

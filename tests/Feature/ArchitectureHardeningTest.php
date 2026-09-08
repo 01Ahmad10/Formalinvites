@@ -15,7 +15,7 @@ class ArchitectureHardeningTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_only_the_supported_roles_can_authenticate(): void
+    public function test_only_admin_and_customer_are_valid_runtime_roles(): void
     {
         $legacyUser = User::factory()->create(['role' => 'support']);
 

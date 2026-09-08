@@ -17,7 +17,7 @@ class PublishedInvitationResolver
 
     public function forParty(InvitationParty $party): EventPublication
     {
-        abort_if($party->event->status === 'archived', 404);
+        abort_unless($party->event->isLive(), 404);
 
         return $party->event->publications()->orderByDesc('version')->firstOrFail();
     }

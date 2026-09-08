@@ -21,7 +21,7 @@ class ClientOnboardingTest extends TestCase
         $package = EventPackage::create(['name' => '201–250 Guests', 'minimum_guests' => 201, 'maximum_guests' => 250, 'price' => 130, 'is_active' => true]);
 
         $this->actingAs($admin)->post(route('admin.clients.store'), [
-            'name' => 'Acme Family', 'phone' => '555', 'guest_capacity' => 220,
+            'name' => 'Acme Family', 'phone' => '555', 'guest_capacity' => 220, 'allowed_events' => 1,
             'primary_name' => 'Maya Client', 'primary_email' => 'maya@example.test', 'primary_password' => 'safe-password',
         ])->assertRedirect();
 
@@ -81,7 +81,7 @@ class ClientOnboardingTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         EventPackage::create(['name'=>'1–50','minimum_guests'=>1,'maximum_guests'=>50,'price'=>100,'is_active'=>true]);
-        $payload = ['name'=>'Client','guest_capacity'=>51,'primary_name'=>'Primary','primary_email'=>'primary@example.test','primary_password'=>'safe-password'];
+        $payload = ['name'=>'Client','guest_capacity'=>51,'allowed_events'=>1,'primary_name'=>'Primary','primary_email'=>'primary@example.test','primary_password'=>'safe-password'];
         $this->actingAs($admin)->post(route('admin.clients.store'), $payload)->assertSessionHasErrors('guest_capacity');
         EventPackage::create(['name'=>'40–60','minimum_guests'=>40,'maximum_guests'=>60,'price'=>120,'is_active'=>true]);
         $payload['guest_capacity'] = 45;
@@ -90,7 +90,7 @@ class ClientOnboardingTest extends TestCase
 
     public function test_non_admins_cannot_create_clients(): void
     {
-        $payload = ['name'=>'Client','guest_capacity'=>20,'primary_name'=>'Primary','primary_email'=>'primary@example.test','primary_password'=>'safe-password'];
+        $payload = ['name'=>'Client','guest_capacity'=>20,'allowed_events'=>1,'primary_name'=>'Primary','primary_email'=>'primary@example.test','primary_password'=>'safe-password'];
         $this->actingAs(User::factory()->create(['role'=>'customer']))->post(route('admin.clients.store'), $payload)->assertForbidden();
     }
 

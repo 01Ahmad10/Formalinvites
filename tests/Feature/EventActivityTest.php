@@ -245,6 +245,7 @@ class EventActivityTest extends TestCase
 
     private function publish(Event $event): EventPublication
     {
+        $event->update(['status' => 'published']);
         $builder = app(InvitationPublicationSnapshotBuilder::class);
         $snapshot = $builder->build($event->fresh());
 

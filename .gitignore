@@ -18,6 +18,8 @@
 /public/storage
 /storage/*.key
 /storage/pail
+# Third-party reference media and visual evidence are local QA only.
+/storage/app/qa/
 /vendor
 Homestead.json
 Homestead.yaml

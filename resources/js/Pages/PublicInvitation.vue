@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import InvitationPreviewRenderer from '@/Components/InvitationPreviewRenderer.vue';
-import EditorialLuxury from '@/Components/InvitationTemplates/EditorialLuxury.vue';
-import ModernCinematic from '@/Components/InvitationTemplates/ModernCinematic.vue';
 import PublicRsvpExperience from '@/Components/PublicRsvpExperience.vue';
-import PublicRomanticFloral from '@/Components/InvitationTemplates/PublicRomanticFloral.vue';
 import { Head } from '@inertiajs/vue3';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
@@ -20,6 +17,8 @@ const audioSource: string | null = props.invitation.experience?.audio || null;
 const isRomanticFloral = computed(() => props.invitation.template?.component_key === 'romantic-floral');
 const isEditorialLuxury = computed(() => props.invitation.template?.component_key === 'editorial-luxury');
 const isModernCinematic = computed(() => props.invitation.template?.component_key === 'modern-cinematic');
+const isReconstructed = computed(() => ['romantic-floral','editorial-luxury','modern-cinematic','dolce-vita','blossom-oud','sacred-garden'].includes(props.invitation.template?.component_key));
+const referenceBackground = computed(() => isRomanticFloral.value ? '#f7e9df' : isEditorialLuxury.value ? '#faf8f5' : '#f9f0e0');
 const cinematicHosts = computed(() => [props.invitation.event.host_name, props.invitation.event.second_host_name].filter(Boolean).join(' & ') || props.invitation.event.title);
 const cinematicShowTitle = computed(() => props.invitation.event.title?.trim().toLocaleLowerCase() !== cinematicHosts.value.trim().toLocaleLowerCase());
 let mediaQuery: MediaQueryList | null = null;
@@ -36,7 +35,13 @@ onBeforeUnmount(() => { mediaQuery?.removeEventListener('change', updateMotion);
 
 <template>
     <Head :title="invitation.event.title" />
-    <main class="min-h-screen overflow-x-hidden bg-[#f8f0ec] text-stone-800" :class="{ 'motion-reduce': reducedMotion }">
+    <main class="min-h-screen overflow-x-hidden bg-[#f8f0ec] text-stone-800" :style="isReconstructed ? { background: referenceBackground } : undefined" :class="{ 'motion-reduce': reducedMotion }" :dir="invitation.content?.primary_locale === 'ar' ? 'rtl' : 'ltr'">
+        <InvitationPreviewRenderer v-if="isReconstructed" :invitation="invitation">
+            <div class="reference-party-rsvp">
+                <PublicRsvpExperience :party="party" :rsvp="rsvp" :meals="meals" :closed="closed" :confirmation="confirmation" :romantic="isRomanticFloral" :editorial="isEditorialLuxury" :cinematic="isModernCinematic" :theme="invitation.template?.component_key" :locale="invitation.content?.primary_locale" />
+            </div>
+        </InvitationPreviewRenderer>
+        <template v-else>
         <audio v-if="audioSource" ref="audio" :src="audioSource" loop preload="none" muted />
         <Transition :name="isModernCinematic ? 'cinematic-opening' : isEditorialLuxury ? 'editorial-opening' : 'card-opening'" mode="out-in">
         <section v-if="!opened" class="romantic-intro-scene relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-4 py-6 sm:px-8" :class="{ 'cinematic-intro-scene': isModernCinematic }" :style="{ transform: reducedMotion ? undefined : `translateY(${parallax}px)` }">
@@ -56,7 +61,7 @@ onBeforeUnmount(() => { mediaQuery?.removeEventListener('change', updateMotion);
                         <span class="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(rgba(104,62,55,0.08)_0.7px,transparent_0.7px)] [background-size:7px_7px]"></span>
                         <svg aria-hidden="true" preserveAspectRatio="xMidYMid meet" viewBox="0 0 180 180" class="card-botanical card-botanical--top"><path fill="currentColor" d="M90 0c10 48 28 79 78 108-51 7-78 28-93 72 0-48-22-82-75-105C44 67 73 42 90 0Z"/><path fill="none" stroke="currentColor" stroke-width="2" d="M21 22c57 43 74 88 67 144M68 57C41 47 24 54 8 77M78 91c33-7 57 9 75 36"/></svg>
                         <svg aria-hidden="true" preserveAspectRatio="xMidYMid meet" viewBox="0 0 180 180" class="card-botanical card-botanical--bottom"><path fill="currentColor" d="M90 0c10 48 28 79 78 108-51 7-78 28-93 72 0-48-22-82-75-105C44 67 73 42 90 0Z"/><path fill="none" stroke="currentColor" stroke-width="2" d="M21 22c57 43 74 88 67 144M68 57C41 47 24 54 8 77M78 91c33-7 57 9 75 36"/></svg>
-                        <span class="relative flex min-h-[25rem] flex-col items-center justify-center"><span class="text-[0.62rem] font-semibold uppercase tracking-[0.42em] text-rose-950/60">FormalEvites</span><span class="mt-8 font-serif text-lg italic text-stone-600 sm:text-xl">You&rsquo;re invited</span><span class="mt-5 font-serif text-[clamp(2.5rem,6vw,5.2rem)] leading-[0.95] text-rose-950" :style="{ fontFamily: invitation.settings.heading_font === 'modern_sans' ? 'ui-sans-serif, system-ui, sans-serif' : 'Georgia, serif' }">{{ invitation.event.title }}</span><span v-if="invitation.party_name" class="mt-8 text-xs uppercase tracking-[0.22em] text-stone-500">For</span><span v-if="invitation.party_name" class="mt-2 font-serif text-2xl text-stone-800 sm:text-3xl">{{ invitation.party_name }}</span><span class="mt-10 inline-flex min-h-12 items-center rounded-full bg-rose-950 px-7 py-3 text-sm font-semibold tracking-[0.13em] text-white shadow-lg transition duration-300 group-hover:bg-rose-800 group-focus-visible:bg-rose-800">Tap to open <span aria-hidden="true" class="ml-2 text-base">→</span></span><span class="mt-4 text-xs text-stone-500">{{ reducedMotion ? 'Reduced motion is enabled.' : 'Open your invitation' }}</span></span>
+                        <span class="relative flex min-h-[25rem] flex-col items-center justify-center"><span class="text-[0.62rem] font-semibold uppercase tracking-[0.42em] text-rose-950/60">FormalEvites</span><span class="mt-8 font-serif text-lg italic text-stone-600 sm:text-xl">You&rsquo;re invited</span><span class="mt-5 font-serif text-[clamp(2.5rem,6vw,5.2rem)] leading-[0.95] text-rose-950" :style="{ fontFamily: invitation.settings.heading_font === 'modern_sans' ? 'ui-sans-serif, system-ui, sans-serif' : 'Georgia, serif' }">{{ invitation.event.title }}</span><span v-if="invitation.party_name" class="mt-8 text-xs uppercase tracking-[0.22em] text-stone-500">For</span><span v-if="invitation.party_name" class="mt-2 font-serif text-2xl text-stone-800 sm:text-3xl">{{ invitation.party_name }}</span><span class="mt-10 inline-flex min-h-12 items-center rounded-full bg-rose-950 px-7 py-3 text-sm font-semibold tracking-[0.13em] text-white shadow-lg transition duration-300 group-hover:bg-rose-800 group-focus-visible:bg-rose-800">Tap to open <span aria-hidden="true" class="ms-2 text-base rtl:rotate-180">→</span></span><span class="mt-4 text-xs text-stone-500">{{ reducedMotion ? 'Reduced motion is enabled.' : 'Open your invitation' }}</span></span>
                     </span>
                     <span class="absolute bottom-[-0.2rem] left-1/2 grid h-14 w-14 -translate-x-1/2 place-items-center rounded-full border-4 border-[#e8d2b0] bg-rose-900 text-xs font-serif text-[#f9e8ca] shadow-lg">FE</span>
                 </span>
@@ -68,12 +73,14 @@ onBeforeUnmount(() => { mediaQuery?.removeEventListener('change', updateMotion);
             </button>
             <div v-else class="relative z-10 w-full max-w-md rounded-3xl bg-white/90 p-10 text-center shadow-2xl"><p class="text-xs font-semibold uppercase tracking-[0.35em] text-rose-900/70">FormalEvites</p><h1 class="mt-8 font-serif text-4xl text-rose-900">{{ invitation.event.title }}</h1><button type="button" class="mt-9 rounded-full bg-rose-900 px-7 py-3 font-medium text-white focus:outline-none focus:ring-4 focus:ring-rose-300" @click="openInvitation">Open invitation</button></div>
         </section>
-        <section v-else id="invitation-content" tabindex="-1" class="invitation-reveal relative px-4 py-8 focus:outline-none sm:px-6 sm:py-12" :class="{ 'romantic-opened-scene': isRomanticFloral, 'editorial-opened-scene': isEditorialLuxury, 'cinematic-opened-scene': isModernCinematic }"><div v-if="isRomanticFloral" class="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,_#f7dede,_transparent_70%)]"></div><div v-else-if="isModernCinematic" class="cinematic-opened-aurora pointer-events-none absolute inset-x-0 top-0 h-[52rem]" :style="{ transform: reducedMotion ? undefined : `translateY(${parallax}px)` }"></div><button v-if="audioSource" type="button" class="fixed right-4 top-4 z-10 min-h-11 rounded-full bg-white/90 px-4 text-sm shadow focus:outline-none focus:ring-2 focus:ring-rose-500" :aria-pressed="!isMuted" @click="toggleAudio">{{ isMuted ? 'Enable sound' : 'Mute sound' }}</button><div class="relative mx-auto max-w-3xl space-y-8" :class="{ 'romantic-opened-stack': isRomanticFloral, 'editorial-opened-stack': isEditorialLuxury, 'cinematic-opened-stack': isModernCinematic }"><PublicRomanticFloral v-if="isRomanticFloral" :invitation="invitation" /><EditorialLuxury v-else-if="isEditorialLuxury" :invitation="invitation" /><ModernCinematic v-else-if="isModernCinematic" :invitation="invitation" /><InvitationPreviewRenderer v-else :invitation="invitation" /><section id="rsvp" class="scroll-mt-6" :class="{ 'romantic-rsvp-area': isRomanticFloral, 'editorial-rsvp-area': isEditorialLuxury, 'cinematic-rsvp-area': isModernCinematic }"><div class="mb-4 text-center" :class="{ 'cinematic-rsvp-heading': isModernCinematic }"><p class="text-xs font-semibold uppercase tracking-[0.28em] text-rose-900/60">Please respond</p><p v-if="invitation.event.rsvp_deadline" class="mt-2 text-sm text-stone-600">Please respond by {{ invitation.event.rsvp_deadline }}.</p></div><PublicRsvpExperience :party="party" :rsvp="rsvp" :meals="meals" :closed="closed" :confirmation="confirmation" :romantic="isRomanticFloral" :editorial="isEditorialLuxury" :cinematic="isModernCinematic" /></section></div></section>
+        <section v-else id="invitation-content" tabindex="-1" class="invitation-reveal relative px-4 py-8 focus:outline-none sm:px-6 sm:py-12" :class="{ 'romantic-opened-scene': isRomanticFloral, 'editorial-opened-scene': isEditorialLuxury, 'cinematic-opened-scene': isModernCinematic }"><div v-if="isRomanticFloral" class="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,_#f7dede,_transparent_70%)]"></div><div v-else-if="isModernCinematic" class="cinematic-opened-aurora pointer-events-none absolute inset-x-0 top-0 h-[52rem]" :style="{ transform: reducedMotion ? undefined : `translateY(${parallax}px)` }"></div><button v-if="audioSource" type="button" class="fixed right-4 top-4 z-10 min-h-11 rounded-full bg-white/90 px-4 text-sm shadow focus:outline-none focus:ring-2 focus:ring-rose-500" :aria-pressed="!isMuted" @click="toggleAudio">{{ isMuted ? 'Enable sound' : 'Mute sound' }}</button><div class="relative mx-auto max-w-3xl space-y-8" :class="{ 'romantic-opened-stack': isRomanticFloral, 'editorial-opened-stack': isEditorialLuxury, 'cinematic-opened-stack': isModernCinematic }"><InvitationPreviewRenderer :invitation="invitation"><section id="rsvp" class="scroll-mt-6" :class="{ 'romantic-rsvp-area': isRomanticFloral, 'editorial-rsvp-area': isEditorialLuxury, 'cinematic-rsvp-area': isModernCinematic }"><div class="mb-4 text-center" :class="{ 'cinematic-rsvp-heading': isModernCinematic }"><p class="text-xs font-semibold uppercase tracking-[0.28em] text-rose-900/60">Please respond</p><p v-if="invitation.event.rsvp_deadline" class="mt-2 text-sm text-stone-600">Please respond by {{ invitation.event.rsvp_deadline }}.</p></div><PublicRsvpExperience :party="party" :rsvp="rsvp" :meals="meals" :closed="closed" :confirmation="confirmation" :romantic="isRomanticFloral" :editorial="isEditorialLuxury" :cinematic="isModernCinematic" :theme="invitation.template?.component_key" :locale="invitation.content?.primary_locale" /></section></InvitationPreviewRenderer></div></section>
         </Transition>
+        </template>
     </main>
 </template>
 
 <style scoped>
+.reference-party-rsvp{max-width:620px;margin:auto;text-align:start;line-height:1.5}.reference-recipient{margin:20px 0;text-align:center;font:18px Georgia,serif}
 @keyframes invitation-reveal { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 .invitation-reveal { animation: invitation-reveal 650ms ease-out both; }
 .romantic-intro-scene { min-height: 100dvh; background: radial-gradient(ellipse at top, #fffdf7 0%, #f7e8df 40%, #d6a7a8 100%); }
@@ -97,7 +104,7 @@ onBeforeUnmount(() => { mediaQuery?.removeEventListener('change', updateMotion);
 .card-opening-enter-active { transition: opacity 650ms ease-out, transform 650ms cubic-bezier(.2,.8,.2,1); }
 .card-opening-enter-from { opacity: 0; transform: translateY(1.25rem); }
 .editorial-cover-background { background: #171716; }
-.editorial-cover { position: relative; z-index: 2; display: block; width: min(calc(100vw - 2rem), 76rem); min-height: min(80dvh, 46rem); padding: clamp(2rem, 6vw, 5rem); overflow: hidden; border: 1px solid rgba(247, 242, 232, 0.52); background: #171716; color: #f7f2e8; text-align: left; box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.34); }
+.editorial-cover { position: relative; z-index: 2; display: block; width: min(calc(100vw - 2rem), 76rem); min-height: min(80dvh, 46rem); padding: clamp(2rem, 6vw, 5rem); overflow: hidden; border: 1px solid rgba(247, 242, 232, 0.52); background: #171716; color: #f7f2e8; text-align: start; box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.34); }
 .editorial-cover:focus-visible { outline: 4px solid rgba(213, 183, 122, 0.8); outline-offset: 5px; }
 .editorial-cover-content { position: relative; z-index: 2; display: flex; min-height: calc(min(80dvh, 46rem) - clamp(4rem, 12vw, 10rem)); flex-direction: column; align-items: flex-start; justify-content: center; max-width: 47rem; }
 .editorial-cover-kicker, .editorial-cover-party { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.23em; text-transform: uppercase; }
@@ -123,7 +130,7 @@ onBeforeUnmount(() => { mediaQuery?.removeEventListener('change', updateMotion);
 .editorial-opened-scene { background: #f2eee6; }
 .editorial-opened-stack { max-width: 76rem; }
 .editorial-rsvp-area { padding: clamp(1.5rem, 5vw, 4rem); border-top: 1px solid rgba(31, 29, 26, 0.35); border-bottom: 1px solid rgba(31, 29, 26, 0.35); background: rgba(247, 242, 232, 0.58); }
-.editorial-rsvp-area > div:first-child { margin-bottom: 2rem; text-align: left; }
+.editorial-rsvp-area > div:first-child { margin-bottom: 2rem; text-align: start; }
 .cinematic-intro-scene { background: #05070c; }
 .cinematic-intro-background { overflow: hidden; background: radial-gradient(ellipse at 72% 8%, rgba(36, 59, 103, 0.7), transparent 43%), radial-gradient(ellipse at 18% 94%, rgba(145, 99, 37, 0.22), transparent 43%), linear-gradient(135deg, #080b13 0%, #05060a 46%, #11192c 100%); }
 .cinematic-intro-background::before, .cinematic-intro-background::after { position: absolute; content: ''; pointer-events: none; }
@@ -133,7 +140,7 @@ onBeforeUnmount(() => { mediaQuery?.removeEventListener('change', updateMotion);
 .cinematic-intro-orb--one { top: -28rem; right: -10rem; width: min(72vw, 74rem); height: min(72vw, 74rem); box-shadow: 0 0 0 4rem rgba(210, 176, 106, 0.025), 0 0 0 11rem rgba(210, 176, 106, 0.02); }
 .cinematic-intro-orb--two { bottom: -18rem; left: -12rem; width: min(46vw, 42rem); height: min(46vw, 42rem); border-color: rgba(137, 166, 185, 0.18); }
 .cinematic-intro-grid { position: absolute; inset: 0; display: block; pointer-events: none; opacity: 0.25; background-image: linear-gradient(rgba(235, 230, 217, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(235, 230, 217, 0.04) 1px, transparent 1px); background-size: 5rem 5rem; mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 76%, transparent); }
-.cinematic-card { position: relative; z-index: 2; display: block; width: min(78vw, 42rem); min-height: min(70vh, 42rem); padding: clamp(2rem, 5vw, 4.5rem); overflow: hidden; border: 1px solid rgba(235, 226, 199, 0.56); background: linear-gradient(145deg, rgba(22, 31, 48, 0.88), rgba(6, 8, 13, 0.88)); color: #f5f1e8; text-align: left; box-shadow: 0 2.5rem 7rem rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.12); backdrop-filter: blur(7px); transition: transform 500ms cubic-bezier(.2,.8,.2,1), box-shadow 500ms ease, border-color 400ms ease; }
+.cinematic-card { position: relative; z-index: 2; display: block; width: min(78vw, 42rem); min-height: min(70vh, 42rem); padding: clamp(2rem, 5vw, 4.5rem); overflow: hidden; border: 1px solid rgba(235, 226, 199, 0.56); background: linear-gradient(145deg, rgba(22, 31, 48, 0.88), rgba(6, 8, 13, 0.88)); color: #f5f1e8; text-align: start; box-shadow: 0 2.5rem 7rem rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.12); backdrop-filter: blur(7px); transition: transform 500ms cubic-bezier(.2,.8,.2,1), box-shadow 500ms ease, border-color 400ms ease; }
 .cinematic-card:hover, .cinematic-card:focus-visible { transform: translateY(-0.7rem) rotateX(1deg) rotateY(-1deg); border-color: rgba(232, 201, 127, 0.88); box-shadow: 0 3.2rem 8rem rgba(0, 0, 0, 0.62), 0 0 3rem rgba(191, 150, 76, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.16); }
 .cinematic-card:focus-visible { outline: 4px solid rgba(232, 201, 127, 0.72); outline-offset: 5px; }
 .cinematic-card-reflection { position: absolute; top: -42%; right: -19%; width: 73%; height: 180%; pointer-events: none; background: linear-gradient(112deg, transparent 34%, rgba(255, 244, 213, 0.11) 47%, transparent 56%); transform: rotate(10deg); transition: transform 650ms ease; }
@@ -157,9 +164,13 @@ onBeforeUnmount(() => { mediaQuery?.removeEventListener('change', updateMotion);
 .cinematic-opened-aurora { background: radial-gradient(ellipse at 72% -5%, rgba(37, 64, 109, 0.38), transparent 48%), radial-gradient(ellipse at 12% 48%, rgba(173, 128, 51, 0.1), transparent 44%); }
 .cinematic-opened-stack { max-width: 86rem; }
 .cinematic-rsvp-area { padding: clamp(1.5rem, 5vw, 4rem); border-top: 1px solid rgba(210, 176, 106, 0.32); border-bottom: 1px solid rgba(210, 176, 106, 0.32); background: rgba(8, 11, 18, 0.68); }
-.cinematic-rsvp-heading { margin-bottom: 2rem; text-align: left; }
+.cinematic-rsvp-heading { margin-bottom: 2rem; text-align: start; }
 .cinematic-rsvp-heading p:first-child { color: #d2b06a; }
 .cinematic-rsvp-heading p:last-child { color: rgba(238, 240, 237, 0.76); }
+@container (max-width: 32rem) {
+    #rsvp { padding: 1.5rem .5rem; }
+    #rsvp.editorial-rsvp-area { padding-inline: 0; }
+}
 @keyframes section-reveal { from { opacity: 0.92; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .invitation-reveal, :global(.reveal-on-scroll.is-visible) { animation: none; } .card-opening-leave-active, .card-opening-enter-active, .editorial-opening-leave-active, .editorial-opening-enter-active, .cinematic-opening-leave-active, .cinematic-opening-enter-active { transition: none; } .cinematic-card, .cinematic-card:hover, .cinematic-card:focus-visible, .cinematic-card-reflection, .cinematic-card:hover .cinematic-card-reflection, .cinematic-card:focus-visible .cinematic-card-reflection { transform: none; transition: none; } }
 @media (max-width: 640px) { .romantic-envelope { width: calc(100vw - 2rem); } .romantic-invitation-card { min-height: 30rem; padding: 2.5rem 1.5rem; } .scene-botanical { width: 15rem; } .editorial-cover { min-height: calc(100dvh - 3rem); } .editorial-cover-content { min-height: calc(100dvh - 7rem); } .editorial-cover-title { font-size: clamp(3.1rem, 16vw, 5rem); } .cinematic-card { width: min(100%, 32rem); min-height: min(74dvh, 39rem); padding: 2rem 1.5rem; } .cinematic-card-content { min-height: calc(min(74dvh, 39rem) - 4rem); } .cinematic-card-hosts { font-size: clamp(3rem, 13vw, 4.7rem); } .cinematic-intro-background::before { inset: 0.7rem; } }

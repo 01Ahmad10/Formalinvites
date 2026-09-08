@@ -1,0 +1,14 @@
+@font-face{font-family:Invitation Script;src:url('/fonts/reference/PinyonScript-Regular.ttf') format('truetype');font-display:swap;font-weight:400}
+@font-face{font-family:Invitation Vibes;src:url('/fonts/reference/GreatVibes-Regular.ttf') format('truetype');font-display:swap;font-weight:400}
+@font-face{font-family:Ovo;src:url('/fonts/reference/Ovo-Regular.ttf') format('truetype');font-display:swap;font-weight:400}
+@font-face{font-family:Cinzel;src:url('/fonts/reference/Cinzel-Variable.ttf') format('truetype');font-display:swap;font-weight:400 900}
+@font-face{font-family:Invitation Sans;src:url('/fonts/reference/Montserrat-Variable.ttf') format('truetype');font-display:swap;font-weight:100 900}
+@font-face{font-family:Invitation Serif;src:url('/fonts/reference/PlayfairDisplay-Variable.ttf') format('truetype');font-display:swap;font-weight:400 900}
+.reference-document{container-type:inline-size;isolation:isolate}
+.reference-document *{box-sizing:border-box}
+.reference-document :is(h1,h2,h3,p){margin:0;font-weight:400}
+.reference-document [data-reveal]{opacity:0;transform:translateY(22px);transition:opacity .75s ease,transform .75s ease}
+.reference-document [data-reveal].arrived{opacity:1;transform:none}
+.reference-document button,.reference-document a{touch-action:manipulation}
+.reference-document :focus-visible{outline:2px solid currentColor;outline-offset:5px}
+@media(prefers-reduced-motion:reduce){.reference-document [data-reveal]{opacity:1;transform:none;transition:none}.reference-document *{animation-duration:.01ms!important;transition-duration:.01ms!important}}

@@ -1,0 +1,26 @@
+/* Styles measured from rendered reference pages, isolated to the local specimens. */
+.wg-event-rsvp{position:relative;padding:48px 20px;max-width:680px;margin:auto;text-align:center}
+@font-face{font-family:WG Script Fallback;src:url('/fonts/reference/PinyonScript-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
+.webgency-demo{--wg-canvas:440px;--wg-paper:#fffdfb;--wg-ink:#4a4a4a;--wg-accent:#7a9aaa;background:var(--wg-paper);color:var(--wg-ink);font:19px/1.3 Georgia,serif;overflow:hidden;isolation:isolate;min-height:100vh}
+.webgency-demo *{box-sizing:border-box}.webgency-demo :is(h1,h2,h3,p){margin:0;font-weight:400}.webgency-demo button{touch-action:manipulation}.webgency-demo :focus-visible{outline:2px solid var(--wg-accent);outline-offset:5px}.webgency-demo .wg-section{position:relative;width:100%;isolation:isolate;text-align:center}.webgency-demo .wg-canvas{width:min(100%,var(--wg-canvas));margin-inline:auto;position:relative}.webgency-demo .wg-heading{font:41px/64px 'WG Script Fallback',Georgia,serif;text-align:center;color:var(--wg-accent)}.webgency-demo .wg-script{font-family:'WG Script Fallback',Georgia,serif}.webgency-demo .wg-body{margin-inline:auto;max-width:calc(100% - 32px)}
+.webgency-demo .wg-art{position:absolute;pointer-events:none;z-index:-1}.webgency-demo .wg-art.reference-asset--missing{background:transparent;border:1px dashed #99856c50}.webgency-demo .wg-art .reference-asset__label{font-size:8px;bottom:4px;left:4px;right:4px}.webgency-demo .wg-photo.reference-asset--missing{background:var(--wg-paper);outline:1px dashed #99856c55;outline-offset:-2px}.webgency-demo .wg-photo .reference-asset__label{z-index:3}.webgency-demo .wg-photo img{object-fit:cover}.webgency-demo video{display:block;object-fit:cover}.webgency-demo .wg-countdown{display:flex;justify-content:center;gap:12px;color:var(--wg-accent)}.webgency-demo .wg-countdown>div{min-width:54px}.webgency-demo .wg-countdown strong{display:block;font:32px/1.25 Georgia,serif}.webgency-demo .wg-countdown small{display:block;font:12px/1.8 Georgia,serif}.webgency-demo .wg-countdown>span{font:28px/1.25 Georgia,serif}
+.webgency-demo .wg-map{position:relative;width:341px;height:343px;max-width:calc(100% - 16px);margin:auto;padding:4px;border:1px solid #bba27d;background:var(--wg-paper)}.webgency-demo .wg-map iframe{display:block;border:0;width:100%;height:100%}.webgency-demo .wg-map .reference-asset{inset:-1px;pointer-events:none;z-index:1;background:transparent}.webgency-demo .wg-map .reference-asset__label{bottom:0;font-size:7px}
+.webgency-demo [data-reveal]{opacity:0;transform:translateY(35px);transition:opacity 1s cubic-bezier(.19,1,.22,1),transform 1s cubic-bezier(.19,1,.22,1)}.webgency-demo [data-reveal].arrived{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.webgency-demo [data-reveal]{opacity:1;transform:none;transition:none}.webgency-demo *{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* Content-driven sizing is limited to real Events; reference demos retain measured slots. */
+.webgency-demo.real-event .dolce-letter,.webgency-demo.real-event .dolce-letter>.wg-canvas{height:auto;min-height:670px}
+.webgency-demo.real-event .dolce-letter-copy{position:relative;top:auto;left:auto;transform:none!important;margin:0 auto;padding:110px 20px 150px;min-height:670px;width:340px;max-width:100%;background:transparent;z-index:3}
+.webgency-demo.real-event .dolce-letter-copy h2{width:auto;margin-inline:0;font-size:30px}
+.webgency-demo.real-event .blossom-invitation,.webgency-demo.real-event .blossom-invitation>.wg-canvas{height:auto;min-height:780px}
+.webgency-demo.real-event .blossom-arabic{position:relative;top:auto;left:auto;margin:auto;padding-top:285px;padding-bottom:50px}
+.webgency-demo.real-event .blossom-invitation h2{position:relative;top:auto;padding:0 20px 100px;overflow-wrap:anywhere}
+.webgency-demo.real-event .blossom-frame{height:calc(100% - 48px)}
+.webgency-demo.real-event .blossom-flower-line{top:auto;bottom:28px}
+.webgency-demo.real-event .sacred-hero,.webgency-demo.real-event .sacred-hero .wg-canvas{height:auto;min-height:1240px}
+.webgency-demo.real-event .sacred-introduction{position:relative;top:auto;padding-top:899px;padding-bottom:48px}
+.webgency-demo.real-event .sacred-preferences{height:auto;min-height:300px;padding-bottom:70px}
+.webgency-demo.real-event .wg-section{overflow-wrap:anywhere}
+.webgency-demo.real-event .native-rsvp-panel input,.webgency-demo.real-event .native-rsvp-panel textarea{direction:inherit}
+[dir=rtl] .wg-script,[dir=rtl] .script-title,[dir=rtl] .garden-document h2,[dir=rtl] .coast-document h2{font-family:Georgia,serif;letter-spacing:normal;line-height:1.5}
+.wg-countdown,time{unicode-bidi:isolate}

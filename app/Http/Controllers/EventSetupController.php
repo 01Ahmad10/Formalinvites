@@ -26,7 +26,7 @@ class EventSetupController extends Controller
         $event->load(['template', 'templateSetting']);
         $currentHash = $snapshots->hash($event);
         $live = $event->publications()->orderByDesc('version')->first();
-        $step = min(max($request->integer('step', 1), 1), 5);
+        $step = min(max($request->integer('step', 1), 1), 2);
 
         return Inertia::render('Events/Setup', [
             'event' => $event,
@@ -65,6 +65,7 @@ class EventSetupController extends Controller
             'details' => $this->details($request),
             'location' => $this->location($request),
             'rsvp' => $this->rsvp($request, $event),
+            'information' => $this->information($request),
             'design' => null,
             default => abort(404),
         };
@@ -77,7 +78,9 @@ class EventSetupController extends Controller
             $publications->publishIfActiveLocked($locked, $request->user());
         });
 
-        $next = ['details' => 2, 'location' => 3, 'rsvp' => 4, 'design' => 5][$step];
+        if ($step === 'information') return to_route('events.builder', $event)->with('success', 'Your invitation is ready to personalize.');
+
+        $next = ['details' => 2, 'location' => 3, 'rsvp' => 4, 'design' => 2][$step];
 
         return to_route('events.setup', ['event' => $event, 'step' => $next])->with('success', 'Invitation setup saved.');
     }
@@ -123,6 +126,20 @@ class EventSetupController extends Controller
         return $data;
     }
 
+    private function information(Request $request): array
+    {
+        $request->validate(['main_date' => ['required', 'date'], 'start_time' => ['required', 'date_format:H:i']]);
+        $details = $this->details($request);
+        $location = $this->location($request);
+        $rsvp = $request->validate(['rsvp_deadline' => ['nullable', 'date']]);
+
+        if (! empty($rsvp['rsvp_deadline']) && ! empty($location['main_date']) && $rsvp['rsvp_deadline'] > $location['main_date']) {
+            throw ValidationException::withMessages(['rsvp_deadline' => 'RSVP deadline must be on or before the Event date.']);
+        }
+
+        return [...$details, ...$location, ...$rsvp];
+    }
+
     private function design(Request $request, Event $event): void
     {
         $data = $request->validate(['template_id' => ['required', 'integer', 'exists:templates,id'], 'settings' => ['nullable', 'array']]);
@@ -151,7 +168,7 @@ class EventSetupController extends Controller
             ->when(! $user->isAdmin(), fn ($query) => $query->where(fn ($query) => $query->where('is_customer_selectable', true)->orWhere('id', $event->template_id)))
             ->orderBy('display_order')->orderBy('name')->get()
             ->filter(fn (Template $template) => $template->id === $event->template_id || ! $template->supported_event_types || in_array($event->event_type, $template->supported_event_types, true))
-            ->map(fn (Template $template) => ['id' => $template->id, 'name' => $template->name, 'description' => $template->description, 'component_key' => $template->component_key, 'is_active' => $template->is_active, ...InvitationTemplateSettings::selectionOptions($template->default_settings)])
+            ->map(fn (Template $template) => ['id' => $template->id, 'name' => $template->name, 'description' => $template->description, 'component_key' => $template->component_key, 'demo_url' => $template->demo_url, 'is_active' => $template->is_active, ...InvitationTemplateSettings::selectionOptions($template->default_settings)])
             ->values()->all();
     }
 

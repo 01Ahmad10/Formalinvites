@@ -9,12 +9,14 @@ class InvitationPublicationSnapshotBuilder
 {
     public function build(Event $event): array
     {
-        $event->loadMissing(['template', 'templateSetting']);
+        $event->loadMissing(['template', 'templateSetting', 'invitationContent']);
 
         $timezone = $event->event_timezone ?: config('app.timezone');
         $template = $event->template;
         $activities = $event->activities()->where('is_active', true)->orderBy('display_order')->orderBy('starts_at')->orderBy('id')->get();
         $meals = $event->mealOptions()->where('is_active', true)->orderBy('display_order')->orderBy('id')->get();
+        $giftMethods = $event->giftMethods()->where('is_active', true)->orderBy('display_order')->orderBy('id')->get();
+        $content = $event->invitationContent;
 
         return [
             'event' => [
@@ -43,6 +45,22 @@ class InvitationPublicationSnapshotBuilder
                 'component_key' => $template->component_key,
             ] : null,
             'settings' => InvitationTemplateSettings::resolve($template?->default_settings, $event->templateSetting?->settings),
+            'content' => [
+                'primary_locale' => $content?->primary_locale ?? 'en',
+                'story_enabled' => (bool) $content?->story_enabled,
+                'story_heading' => $content?->story_heading,
+                'story_body' => $content?->story_body,
+                'gift_registry_enabled' => (bool) $content?->gift_registry_enabled,
+                'gift_registry_intro' => $content?->gift_registry_intro,
+                'ending_enabled' => (bool) $content?->ending_enabled,
+                'ending_title' => $content?->ending_title,
+                'ending_message' => $content?->ending_message,
+            ],
+            'gift_methods' => $giftMethods->map(fn ($method) => [
+                'label' => $method->label,
+                'details' => $method->details,
+                'external_url' => $method->external_url,
+            ])->values()->all(),
             'activities' => $activities->map(fn ($activity) => [
                 'title' => $activity->title,
                 'activity_type' => $activity->activity_type,

@@ -14,7 +14,7 @@ type Analytics = {
     event_status: BreakdownItem[];
     rsvp_breakdown: { response_rate: number; items: BreakdownItem[] };
     events_by_type: { label: string; count: number }[];
-    upcoming: { id: number; title: string; client: string | null; date: string | null; type: string | null; capacity: number | null; status: string }[];
+    upcoming: { id: number; title: string; client: string | null; template_name: string | null; date: string | null; type: string | null; capacity: number | null; status: string }[];
     attention: { id: number; title: string; message: string }[];
 };
 
@@ -75,7 +75,7 @@ const eventTypeDatasets = computed(() => props.analytics ? [{ label: 'Events', d
             </section>
 
             <section class="mt-6 grid items-start gap-6 lg:grid-cols-2">
-                <article class="fe-card min-w-0 p-5"><div class="flex items-center justify-between gap-3"><h2 class="fe-section-title">Upcoming Events</h2><Link :href="route('events.index')" class="text-sm underline">View events</Link></div><div v-if="analytics.upcoming.length" class="mt-4 space-y-3"><article v-for="event in analytics.upcoming" :key="event.id" class="rounded border border-[color:var(--fe-border)] p-3"><div class="flex flex-wrap justify-between gap-2"><div><p class="font-semibold">{{ event.title }}</p><p class="text-sm text-[color:var(--fe-text-secondary)]">{{ event.date }} · {{ event.client || 'Client not set' }}</p><p class="text-sm text-[color:var(--fe-text-muted)]">{{ event.type }} · {{ event.capacity ?? '—' }} guests · {{ event.status }}</p></div><Link :href="route('events.show', event.id)" class="fe-btn fe-btn-secondary">Manage</Link></div></article></div><p v-else class="mt-4 text-sm text-[color:var(--fe-text-muted)]">No upcoming events.</p></article>
+                <article class="fe-card min-w-0 p-5"><div class="flex items-center justify-between gap-3"><h2 class="fe-section-title">Upcoming Events</h2><Link :href="route('events.index')" class="text-sm underline">View events</Link></div><div v-if="analytics.upcoming.length" class="mt-4 space-y-3"><article v-for="event in analytics.upcoming" :key="event.id" class="rounded border border-[color:var(--fe-border)] p-3"><div class="flex flex-wrap justify-between gap-2"><div><p class="font-semibold">{{ event.title }}</p><p class="text-sm text-[color:var(--fe-text-secondary)]">{{ event.date }} · {{ event.client || 'Client not set' }}</p><p class="text-sm text-[color:var(--fe-text-muted)]">{{ event.type }} · {{ event.template_name || 'No template selected' }} · {{ event.capacity ?? '—' }} guests · {{ event.status }}</p></div><Link :href="route('events.show', event.id)" class="fe-btn fe-btn-secondary">Manage</Link></div></article></div><p v-else class="mt-4 text-sm text-[color:var(--fe-text-muted)]">No upcoming events.</p></article>
                 <article class="fe-card min-w-0 p-5"><h2 class="fe-section-title">Needs Attention</h2><div v-if="analytics.attention.length" class="mt-4 space-y-3"><article v-for="item in analytics.attention" :key="item.id" class="rounded border border-[color:var(--fe-border)] p-3"><p class="font-semibold">{{ item.title }}</p><p class="text-sm text-[color:var(--fe-text-secondary)]">{{ item.message }}</p><Link :href="route('events.show', item.id)" class="mt-2 inline-block text-sm underline">Review event</Link></article></div><p v-else class="mt-4 text-sm text-[color:var(--fe-text-muted)]">Nothing needs attention right now.</p></article>
             </section>
 

@@ -1,126 +1,64 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-
+import { computed, onBeforeUnmount, ref } from 'vue';
+import { familyGreeting, invitationText } from './invitationText';
+import ReferenceAsset from './ReferenceAsset.vue';
+import ReferenceRsvpDemo from './ReferenceRsvpDemo.vue';
+import ScratchDateTile from './ScratchDateTile.vue';
+import { useReferenceExperience } from './referenceExperience';
 const props = defineProps<{ invitation: any }>();
-const headingFamily = computed(() => props.invitation.settings.heading_font === 'modern_sans' ? 'ui-sans-serif, system-ui, sans-serif' : props.invitation.settings.heading_font === 'classic_serif' ? 'ui-serif, Georgia, serif' : 'Georgia, serif');
-const bodyFamily = computed(() => props.invitation.settings.body_font === 'serif' ? 'ui-serif, Georgia, serif' : 'ui-sans-serif, system-ui, sans-serif');
-</script>
-
-<template>
-    <article class="editorial-document" :style="{ backgroundColor: invitation.settings.background_color, color: invitation.settings.text_color, fontFamily: bodyFamily, '--editorial-heading': headingFamily }">
-        <header class="editorial-hero">
-            <p class="editorial-kicker">{{ invitation.event.event_type || 'Private event' }}</p>
-            <span class="editorial-hero-rule" :style="{ backgroundColor: invitation.settings.accent_color }"></span>
-            <div class="editorial-hero-grid">
-                <p class="editorial-volume">{{ invitation.event.main_date?.slice(-4) || 'EVENT' }}</p>
-                <div>
-                    <p class="editorial-intro">An invitation</p>
-                    <h1 :style="{ color: invitation.settings.primary_color }">{{ invitation.event.host_name }}<span v-if="invitation.event.second_host_name"> <em>&amp;</em> {{ invitation.event.second_host_name }}</span></h1>
-                    <p v-if="invitation.party_name" class="editorial-party">For {{ invitation.party_name }}</p>
-                </div>
-            </div>
-            <h2>{{ invitation.event.title }}</h2>
-        </header>
-
-        <div class="editorial-body">
-            <section v-if="invitation.event.main_date" class="reveal-on-scroll editorial-date-block">
-                <p class="editorial-index">01 / DATE</p>
-                <p class="editorial-date">{{ invitation.event.main_date }}</p>
-                <p class="editorial-time">{{ invitation.event.start_time || 'Time to be confirmed' }}<span v-if="invitation.event.end_time"> — <span v-if="invitation.event.end_date && invitation.event.end_date !== invitation.event.main_date">{{ invitation.event.end_date }}, </span>{{ invitation.event.end_time }}</span></p>
-                <p class="editorial-timezone">{{ invitation.event.timezone }}</p>
-            </section>
-
-            <section v-if="invitation.event.activities?.length" class="reveal-on-scroll editorial-section">
-                <div class="editorial-section-label"><p class="editorial-index">02 / PROGRAMME</p><h2>Schedule</h2></div>
-                <ol class="editorial-schedule">
-                    <li v-for="(activity, index) in invitation.event.activities" :key="`${activity.title}-${index}`">
-                        <span class="editorial-number">{{ String(index + 1).padStart(2, '0') }}</span>
-                        <div><h3>{{ activity.title }}</h3><p class="editorial-activity-time">{{ activity.date }} · {{ activity.start_time }}<span v-if="activity.end_time"> — <span v-if="activity.end_date !== activity.date">{{ activity.end_date }}, </span>{{ activity.end_time }}</span></p></div>
-                        <div class="editorial-activity-detail"><p v-if="activity.venue || activity.address">{{ activity.venue }}<span v-if="activity.address"> · {{ activity.address }}</span></p><p v-if="activity.description">{{ activity.description }}</p><p v-if="activity.location_notes">{{ activity.location_notes }}</p></div>
-                    </li>
-                </ol>
-            </section>
-
-            <section v-if="invitation.event.venue || invitation.event.address" class="reveal-on-scroll editorial-location">
-                <div><p class="editorial-index">03 / PLACE</p><h2>{{ invitation.event.venue || 'Venue to be confirmed' }}</h2></div>
-                <div><p v-if="invitation.event.address" class="editorial-copy">{{ invitation.event.address }}</p><a v-if="invitation.event.location_url" :href="invitation.event.location_url" target="_blank" rel="noopener noreferrer" class="editorial-link">Open location <span aria-hidden="true">↗</span></a></div>
-            </section>
-
-            <section v-if="invitation.event.guest_information || invitation.event.dress_code || invitation.event.parking_information || invitation.event.transportation_information || invitation.event.accommodation_information" class="reveal-on-scroll editorial-section editorial-logistics">
-                <div class="editorial-section-label"><p class="editorial-index">04 / NOTES</p><h2>Guest information</h2></div>
-                <div class="editorial-notes-grid">
-                    <div v-if="invitation.event.guest_information" class="editorial-note editorial-note--wide"><h3>For guests</h3><p>{{ invitation.event.guest_information }}</p></div>
-                    <div v-if="invitation.event.dress_code" class="editorial-note"><h3>Dress code</h3><p>{{ invitation.event.dress_code }}</p></div>
-                    <div v-if="invitation.event.parking_information" class="editorial-note"><h3>Parking</h3><p>{{ invitation.event.parking_information }}</p></div>
-                    <div v-if="invitation.event.transportation_information" class="editorial-note"><h3>Transportation</h3><p>{{ invitation.event.transportation_information }}</p></div>
-                    <div v-if="invitation.event.accommodation_information" class="editorial-note"><h3>Accommodation</h3><p>{{ invitation.event.accommodation_information }}</p></div>
-                </div>
-            </section>
-
-            <footer v-if="invitation.event.host_name" class="reveal-on-scroll editorial-closing"><span :style="{ backgroundColor: invitation.settings.accent_color }"></span><p>With anticipation,</p><strong>{{ invitation.event.host_name }}<template v-if="invitation.event.second_host_name"> &amp; {{ invitation.event.second_host_name }}</template></strong></footer>
-        </div>
-    </article>
-</template>
-
-<style scoped>
-.editorial-document { container-type: inline-size; max-width: 100%; overflow: hidden; border: 1px solid color-mix(in srgb, currentColor 16%, transparent); box-shadow: 0 1.5rem 4.5rem rgba(12, 14, 16, 0.13); }
-.editorial-document :is(h1, h2, h3, p, a) { min-width: 0; overflow-wrap: anywhere; }
-.editorial-hero { padding: clamp(2rem, 6vw, 5rem) clamp(1.5rem, 7vw, 6rem) clamp(4rem, 10vw, 8rem); border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
-.editorial-kicker, .editorial-index { margin: 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.21em; text-transform: uppercase; }
-.editorial-hero-rule { display: block; width: 4.5rem; height: 1px; margin: 1.5rem 0 3.5rem; }
-.editorial-hero-grid { display: grid; grid-template-columns: minmax(6rem, 0.55fr) 2fr; gap: clamp(1.5rem, 5vw, 5rem); align-items: start; }
-.editorial-volume { margin: -0.15em 0 0; font-family: Georgia, serif; font-size: clamp(4.5rem, 13vw, 10rem); line-height: 0.7; opacity: 0.12; }
-.editorial-intro { margin: 0; font-family: Georgia, serif; font-size: 1.1rem; font-style: italic; }
-.editorial-hero h1 { max-width: 14ch; margin: 0.35rem 0 0; font-family: var(--editorial-heading); font-size: clamp(2.8rem, 7vw, 6.6rem); font-weight: 400; line-height: 0.88; letter-spacing: -0.045em; }
-.editorial-hero h1 em { font-size: 0.48em; font-weight: 400; }
-.editorial-party { margin: 1.8rem 0 0; font-size: 0.9rem; letter-spacing: 0.04em; }
-.editorial-hero h2 { max-width: 22ch; margin: clamp(3.5rem, 9vw, 7rem) 0 0 auto; font-family: var(--editorial-heading); font-size: clamp(1rem, 2.3vw, 1.7rem); font-weight: 500; line-height: 1.25; text-align: right; }
-.editorial-body { padding: clamp(2.5rem, 7vw, 6rem); }
-.editorial-date-block { display: grid; grid-template-columns: 1fr auto; gap: 0.55rem 2rem; align-items: end; padding-bottom: clamp(3rem, 8vw, 6rem); border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
-.editorial-date-block .editorial-index { grid-column: 1 / -1; margin-bottom: 1.2rem; }
-.editorial-date { margin: 0; font-family: var(--editorial-heading); font-size: clamp(2.25rem, 5vw, 4.4rem); line-height: 0.95; }
-.editorial-time { margin: 0; font-size: 1rem; text-align: right; }
-.editorial-timezone { grid-column: 1 / -1; margin: 0.3rem 0 0; font-size: 0.78rem; opacity: 0.6; }
-.editorial-section, .editorial-location { margin-top: clamp(3.5rem, 9vw, 7rem); }
-.editorial-section-label { display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; align-items: baseline; }
-.editorial-section-label h2, .editorial-location h2 { margin: 0; font-family: var(--editorial-heading); font-size: clamp(2rem, 4vw, 3.6rem); font-weight: 400; line-height: 0.95; }
-.editorial-schedule { margin: 2.6rem 0 0; padding: 0; border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent); list-style: none; }
-.editorial-schedule li { display: grid; grid-template-columns: 4rem minmax(10rem, 1fr) minmax(12rem, 0.9fr); gap: 1.5rem; padding: 1.7rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
-.editorial-number { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; }
-.editorial-schedule h3 { margin: 0; font-family: var(--editorial-heading); font-size: 1.6rem; font-weight: 400; }
-.editorial-activity-time, .editorial-activity-detail p { margin: 0.4rem 0 0; font-size: 0.88rem; line-height: 1.55; opacity: 0.78; }
-.editorial-activity-detail p + p { margin-top: 0.65rem; }
-.editorial-location { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(2rem, 8vw, 7rem); padding: clamp(2rem, 5vw, 4rem) 0; border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
-.editorial-copy { margin: 0; white-space: pre-line; line-height: 1.65; }
-.editorial-link { display: inline-flex; gap: 0.55rem; margin-top: 1.5rem; color: inherit; font-size: 0.82rem; font-weight: 700; letter-spacing: 0.08em; text-decoration: none; text-transform: uppercase; }
-.editorial-link:focus-visible { outline: 3px solid color-mix(in srgb, currentColor 25%, transparent); outline-offset: 4px; }
-.editorial-notes-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin-top: 2.6rem; border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
-.editorial-note { padding: 1.6rem 1.4rem 1.6rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
-.editorial-note:nth-child(even) { padding-right: 0; padding-left: 1.4rem; border-left: 1px solid color-mix(in srgb, currentColor 14%, transparent); }
-.editorial-note--wide { grid-column: 1 / -1; padding-right: 0; }
-.editorial-note h3 { margin: 0; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; }
-.editorial-note p { margin: 0.8rem 0 0; white-space: pre-line; line-height: 1.6; }
-.editorial-closing { margin-top: clamp(4rem, 9vw, 7rem); text-align: right; }
-.editorial-closing > span { display: block; width: 4rem; height: 1px; margin: 0 0 1.25rem auto; }
-.editorial-closing p { margin: 0; font-family: var(--editorial-heading); font-size: 1.1rem; font-style: italic; }
-.editorial-closing strong { display: block; margin-top: 0.25rem; font-family: var(--editorial-heading); font-size: 1.55rem; font-weight: 400; }
-/* The protected dashboard preview is a narrow component even on a wide viewport.
-   Container queries keep its editorial hierarchy while preventing its grids from
-   using desktop-sized viewport measurements. */
-@container (max-width: 46rem) {
-    .editorial-hero { padding: clamp(2rem, 6cqi, 3rem) clamp(1.5rem, 7cqi, 3rem) clamp(4rem, 10cqi, 5rem); }
-    .editorial-hero-rule { margin: 1.5rem 0 2.5rem; }
-    .editorial-hero-grid, .editorial-date-block, .editorial-section-label, .editorial-location { grid-template-columns: 1fr; }
-    .editorial-volume { font-size: clamp(4.5rem, 13cqi, 6rem); }
-    .editorial-hero h1 { font-size: clamp(2.8rem, 9cqi, 4.6rem); }
-    .editorial-hero h2 { margin-top: clamp(3.5rem, 9cqi, 4.5rem); text-align: left; }
-    .editorial-body { padding: clamp(2.5rem, 7cqi, 3rem); }
-    .editorial-time { text-align: left; }
-    .editorial-schedule li { grid-template-columns: 2.5rem minmax(0, 1fr); gap: 0.7rem; }
-    .editorial-activity-detail { grid-column: 2; }
-    .editorial-notes-grid { grid-template-columns: 1fr; }
-    .editorial-note, .editorial-note:nth-child(even) { padding: 1.4rem 0; border-left: 0; }
-    .editorial-note--wide { grid-column: auto; }
+const t = (text: string) => invitationText(props.invitation, text);
+const root = ref<HTMLElement | null>(null);
+const { names, date, validDate, countdown, enter } = useReferenceExperience(() => props.invitation, root);
+// Recreate the measured paper edge from alternating notches and clipped corners.
+const paperEdge = `polygon(${Array.from({ length: 4 }, (_, side) => {
+    const edge = [...Array.from({ length: 13 }, (_, i) => [8 + i * 7, i % 2 * 2]), [96, 4]];
+    return edge.map(([x, y]) => {
+        for (let turn = 0; turn < side; turn++) [x, y] = [100 - y, x];
+        return `${x}% ${y}%`;
+    }).join(',');
+}).join(',')})`;
+const opened = ref(false), settled = ref(false), revealed = ref(0);
+let openingTimer: ReturnType<typeof setTimeout>;
+const audio = ref<HTMLAudioElement | null>(null), muted = ref(true), musicNotice = ref(false);
+function open() { opened.value = true; openingTimer = setTimeout(() => { settled.value = true; }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 5083); }
+async function toggleMusic() { if (!props.invitation.experience?.audio) { musicNotice.value = !musicNotice.value; return; } if (muted.value) { try { await audio.value?.play(); muted.value = false; } catch { musicNotice.value = true; } } else { audio.value?.pause(); muted.value = true; } }
+onBeforeUnmount(() => { clearTimeout(openingTimer); audio.value?.pause(); });
+const meeting = computed(() => props.invitation.event.activities?.filter((a: any) => a.activity_type === 'meeting_point') || []);
+const locations = computed(() => props.invitation.event.activities?.filter((a: any) => a.activity_type !== 'meeting_point') || []);
+function locationText(activity: { venue?: string; start_time?: string; address?: string }) {
+    const venueAndTime = [activity.venue, activity.start_time].filter(Boolean).join(' - ');
+    return [venueAndTime, activity.address].filter(Boolean).join(' ');
 }
-@media (max-width: 640px) { .editorial-hero-grid, .editorial-date-block, .editorial-section-label, .editorial-location { grid-template-columns: 1fr; } .editorial-volume { font-size: 5rem; } .editorial-hero h2 { margin-top: 4rem; text-align: left; } .editorial-time { text-align: left; } .editorial-schedule li { grid-template-columns: 2.5rem 1fr; gap: 0.7rem; } .editorial-activity-detail { grid-column: 2; } .editorial-notes-grid { grid-template-columns: 1fr; } .editorial-note, .editorial-note:nth-child(even) { padding: 1.4rem 0; border-left: 0; } .editorial-note--wide { grid-column: auto; } }
+const dateParts = computed(() => validDate.value ? [String(date.value.getDate()).padStart(2,'0'), date.value.toLocaleDateString('en-US',{month:'short'}), String(date.value.getFullYear())] : []);
+</script>
+<template>
+<article ref="root" class="reference-document theatre-document">
+    <audio v-if="invitation.experience?.audio" ref="audio" :src="invitation.experience.audio" loop preload="none"></audio>
+    <button class="theatre-music" type="button" :aria-label="invitation.experience?.audio ? 'Toggle music' : 'Music asset unavailable'" :aria-pressed="!muted" @click="toggleMusic">{{ muted ? '♪' : 'Ⅱ' }}</button><p v-if="musicNotice" class="theatre-music-notice" role="status">Temporary placeholder · invitation soundtrack unavailable</p>
+    <header class="theatre-hero" :class="{ opened, settled }">
+        <ReferenceAsset background :name="opened ? 'curtain-video-BAKLj3Y5.mp4 · final frame' : 'curtain-closed-Bpkadld4.jpg'" :src="invitation.media?.curtainStill" />
+        <video v-if="invitation.media?.curtainVideo && opened" :src="invitation.media.curtainVideo" autoplay playsinline muted class="theatre-video" @ended="settled = true"></video>
+        <button type="button" class="theatre-tap" :class="{ dismissed: opened }" :disabled="opened" :aria-hidden="opened" :tabindex="opened ? -1 : 0" @click="open"><span class="theatre-tap-inner"><span class="theatre-hand">☝︎</span><span>{{ t("Tap to open") }}</span></span></button>
+        <div class="theatre-identity"><p v-if="invitation.party_name" class="native-family-greeting" data-family-greeting>{{ familyGreeting(invitation) }}</p><p class="theatre-eyebrow">You are cordially invited to celebrate the Wedding of</p><h1>{{ invitation.event.host_name }}</h1><span v-if="invitation.event.second_host_name" class="theatre-amp">&amp;</span><h1 v-if="invitation.event.second_host_name">{{ invitation.event.second_host_name }}</h1><div v-if="invitation.reference_demo?.families" class="theatre-parents"><p>Together with their parents</p><span v-for="family in invitation.reference_demo.families" :key="family">Mr. &amp; Mrs. {{ family }}</span></div></div>
+        <button :aria-hidden="!settled" :disabled="!settled" :tabindex="settled ? 0 : -1" class="theatre-scroll" type="button" @click="enter">{{ t("Scroll") }}<span>↓</span></button>
+    </header>
+    <section v-if="validDate" class="theatre-section paper theatre-reveal" data-invitation-content><div><h2 class="script-title">{{ t("Reveal") }}</h2><p class="kicker">{{ t("Scratch to discover the date") }}</p><div class="theatre-scratch" aria-label="Wedding date"><ScratchDateTile v-for="(part,i) in dateParts" :key="part" :value="part" :label="['day','month','year'][i]" :texture="invitation.media?.scratchGold" @revealed="revealed++" /></div><p class="theatre-married" :class="{ visible: revealed === 3 }">{{ t("We're getting married!") }}</p></div></section>
+    <section v-if="validDate" class="theatre-section theatre-countdown"><h2 class="script-title">{{ t("Countdown") }}</h2><div class="theatre-counter"><div v-for="(value,i) in countdown" :key="i"><strong>{{ value }}</strong><span>{{ t(['Days','Hours','Minutes','Seconds'][i]) }}</span></div></div><p class="lead">{{ t("Until the big day") }}</p></section>
+    <section v-if="meeting.length" class="theatre-section paper"><div class="theatre-menu"><ReferenceAsset background name="menu-frame-BFE5kCs7.png" :src="invitation.media?.menuFrame" /><div class="theatre-menu-items"><article v-for="(activity,i) in meeting" :key="i"><h3>{{ activity.title }}</h3><p>{{ activity.venue }}</p><a v-if="activity.location_url" :href="activity.location_url" target="_blank" rel="noopener noreferrer">{{ t("Directions") }}</a></article><p class="script-note">{{ names }}</p></div></div></section>
+    <section v-if="locations.length || invitation.event.venue" class="theatre-section theatre-locations"><p class="kicker">{{ t("How to get there") }}</p><h2 class="display-title">{{ t("Wedding Locations") }}</h2><p class="lead">{{ t("Please use the location links below to find your way to each part of the day.") }}</p><article v-for="(activity,i) in locations" :key="i"><p class="kicker">{{ activity.title }}</p><p class="theatre-place">{{ locationText(activity) }}</p><p v-if="!invitation.reference_demo">{{ activity.date }}<template v-if="activity.end_time"> · Until <template v-if="activity.end_date && activity.end_date !== activity.date">{{ activity.end_date }}, </template>{{ activity.end_time }}</template></p><p v-if="activity.description" class="lead">{{ activity.description }}</p><p v-if="activity.location_notes">{{ activity.location_notes }}</p><p v-if="i === 1 && invitation.reference_demo" class="theatre-venue-time">{{ invitation.event.start_time }}</p><a v-if="activity.location_url" :href="activity.location_url" target="_blank" rel="noopener noreferrer" class="theatre-direction">{{ t("Directions") }}</a></article><article v-if="(invitation.event.venue || invitation.event.address) && !locations.some((a: any) => a.venue === invitation.event.venue && a.address === invitation.event.address)"><p class="theatre-place">{{ invitation.event.venue }}</p><p>{{ invitation.event.address }}</p><a v-if="invitation.event.location_url" :href="invitation.event.location_url" target="_blank" rel="noopener noreferrer" class="theatre-direction">{{ t("Directions") }}</a></article></section>
+    <section data-section="story" v-if="invitation.content?.story_enabled" class="theatre-section paper"><h2 class="display-title">{{ invitation.content.story_heading || t('Our Story') }}</h2><p class="lead preserve-lines">{{ invitation.content.story_body }}</p></section>
+    <section data-section="gifts" v-if="invitation.content?.gift_registry_enabled" class="theatre-section paper theatre-gifts"><p class="kicker">{{ t("Wedding registry") }}</p><ReferenceAsset class="theatre-gift-icon" name="gift-icon-BssCdzah.png" :src="invitation.media?.giftIcon" /><h2 class="display-title">{{ t("Gifts") }}</h2><p class="lead">{{ invitation.content.gift_registry_intro }}</p><p class="script-note">{{ t("With all our love") }}</p><p class="kicker theatre-gift-details">{{ t("Gift details") }}</p><div v-for="(method,i) in invitation.gift_methods" :key="i" class="theatre-bank"><p>{{ method.label }}</p><p>{{ method.details }}</p><a v-if="method.external_url" :href="method.external_url" target="_blank" rel="noopener noreferrer">{{ t("View registry") }}</a></div></section>
+    <section v-if="!invitation.reference_demo && (invitation.event.dress_code || invitation.event.guest_information || invitation.event.parking_information || invitation.event.transportation_information || invitation.event.accommodation_information)" class="theatre-section"><h2 class="display-title">{{ t("Guest information") }}</h2><p v-for="(note,i) in [invitation.event.dress_code,invitation.event.guest_information,invitation.event.parking_information,invitation.event.transportation_information,invitation.event.accommodation_information].filter(Boolean)" :key="i" class="lead">{{ note }}</p></section>
+    <section class="theatre-section theatre-rsvp"><div class="theatre-rsvp-wrap"><p class="theatre-attendance">{{ t("Attendance confirmation") }}</p><h2 class="script-title">{{ t("Confirm your attendance") }}</h2><p v-if="invitation.event.rsvp_deadline" class="theatre-deadline">Kindly confirm before {{ invitation.event.rsvp_deadline }}.</p><slot><ReferenceRsvpDemo variant="theatre" /></slot></div></section>
+    <section data-section="ending" v-if="invitation.content?.ending_enabled !== false" class="theatre-section paper"><div class="theatre-thank-card"><div :style="{ clipPath: paperEdge }"><h2 class="script-title">{{ invitation.content?.ending_title || 'Thank You' }}</h2><p>{{ invitation.content?.ending_message || 'Join us in celebrating our love and happiness on this special day.' }}</p><p class="script-note">{{ names }}</p></div></div></section><footer><span class="template-footer-brand">FormalEvites</span></footer>
+</article>
+</template>
+<style scoped>
+.theatre-document{background:#fff;color:#5c2018;text-align:center;font:16px/1.35 Arial,sans-serif}.theatre-document .script-title,.theatre-document .script-note,.theatre-identity h1,.theatre-amp{font-family:'Invitation Vibes',cursive;font-weight:400}.theatre-hero{height:100svh;position:relative;isolation:isolate;overflow:hidden;background:#faf8f5}.theatre-hero>.reference-asset{background:#5c2018}.theatre-hero>.reference-asset{transition:opacity .45s ease}.theatre-hero.opened>.reference-asset{opacity:0}.theatre-hero.opened>.reference-asset--missing{opacity:1;background:#faf8f5}.theatre-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1}.theatre-tap{position:absolute;inset:0;display:grid;place-items:center;width:100%;color:#ffffffd1;z-index:3;transition:opacity .35s ease,transform .35s ease}.theatre-tap.dismissed{opacity:0;transform:scale(.96);pointer-events:none}.theatre-tap-inner{display:flex;align-items:center;flex-direction:column;gap:16px;font-size:12.8px;letter-spacing:1.024px;animation:theatre-pulse 1.8s ease-in-out infinite}.theatre-hand{width:88px;height:88px;border:1px solid #ffffff80;border-radius:50%;display:grid;place-items:center;font-size:40px;background:#5c20182e}.theatre-identity{position:absolute;top:48.6%;left:50%;transform:translate(-50%,-50%);width:55%;max-width:620px;opacity:0;transition:opacity 1.8s ease;pointer-events:none}.settled .theatre-identity{opacity:1}.theatre-eyebrow{max-width:300px;margin:0 auto 16px!important;padding:0 40px;font-family:Georgia,serif;font-size:8px;line-height:12px;letter-spacing:1.2px;text-transform:uppercase}.theatre-identity h1{font-size:clamp(60px,9vw,115.2px);line-height:1}.theatre-amp{display:block;font-size:clamp(35.2px,4.5vw,64px);line-height:1}.theatre-parents{max-width:304px;margin:22.4px auto 0;padding:13.6px 0;border-block:1px solid #5c201830}.theatre-parents p{font-size:8.8px;letter-spacing:1.936px;text-transform:uppercase;margin-bottom:7.2px}.theatre-parents span{display:block;font-size:15.2px;letter-spacing:1.216px;margin:2.4px 0;line-height:19px}.theatre-scroll{opacity:0;transition:opacity .9s ease;position:absolute;bottom:24px;left:0;width:100%;font:10.4px/12px Georgia,serif;letter-spacing:2.08px;text-transform:uppercase;animation:theatre-float 2s ease-in-out infinite}.settled .theatre-scroll{opacity:1}.theatre-scroll span{display:block;font-size:24px;line-height:24px;margin-top:7.2px}.theatre-section{padding:48px 24px}.theatre-section:not(.theatre-rsvp){font-family:'Invitation Sans',Arial,sans-serif}.paper{background:#faf8f5}.theatre-document .script-title{font-size:36px;line-height:36px;margin-bottom:24px}.theatre-document .display-title{font:500 36px/1 Georgia,serif;letter-spacing:1.08px;margin-bottom:32px}.theatre-document .kicker{font-size:12px;line-height:16px;letter-spacing:2.4px;text-transform:uppercase;margin-bottom:14.4px}.theatre-document .lead{max-width:640px;margin:0 auto 40px;line-height:28.8px}.theatre-document .script-note{font-size:32px;line-height:40px}.theatre-reveal{min-height:100svh;display:flex;justify-content:center;flex-direction:column}.theatre-scratch{display:flex;justify-content:center;gap:clamp(12px,5vw,48px);margin:46.4px 0 32px}.theatre-married{font:clamp(32px,5vw,48px) 'Invitation Vibes',cursive;margin-top:56px!important;opacity:0;transform:translateY(12px) scale(.96);transition:opacity .55s ease,transform .55s ease}.theatre-married.visible{opacity:1;transform:none}.theatre-counter{display:flex;justify-content:center;gap:32px;margin:32px auto}.theatre-counter strong{display:grid;place-items:center;width:clamp(64px,10vw,80px);height:clamp(64px,10vw,80px);border:1px solid #5c2018;border-radius:8px;font:400 clamp(25.6px,4vw,32px) Georgia,serif}.theatre-counter span{display:block;text-transform:uppercase;font-size:11.52px;line-height:15px;letter-spacing:1.728px;margin-top:9.6px}.theatre-menu{position:relative;isolation:isolate;aspect-ratio:9/16;max-width:520px;margin:auto}.theatre-menu>.reference-asset{background:transparent;border:1px dashed #5c20184d}.theatre-menu-items{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:0;padding:5% 12% 10%;transform:translateY(-8px)}.theatre-menu-items h3{font:700 20px/24px Georgia,serif;letter-spacing:4px;text-transform:uppercase;margin-bottom:5.6px}.theatre-menu-items article>p{font-size:16.8px;line-height:23.52px;margin:1.6px 0}.theatre-menu-items article{margin-bottom:clamp(17.6px,3vw,28px)}.theatre-menu-items .script-note{font-size:clamp(24px,3.6vw,32px);line-height:1.25}.theatre-menu-items a{display:inline-block;margin-top:7.2px;font-size:9.6px;line-height:12px;letter-spacing:1.536px;text-transform:uppercase;border:1px solid #5c2018;border-radius:999px;padding:8.8px 16px}.theatre-locations article{margin:0 auto 48px}.theatre-locations .theatre-place{font:clamp(24px,4vw,40px)/1.2 Georgia,serif;margin-bottom:5.6px}.theatre-locations .kicker{margin-bottom:17.6px}.theatre-locations>.kicker{margin-bottom:14.4px}.theatre-direction{display:inline-block;border:1px solid #5c2018;padding:13.6px 21.6px;margin:20px 0 0;font-size:11.52px;line-height:15px;text-transform:uppercase;letter-spacing:1.8432px;border-radius:999px}.theatre-venue-time{font:clamp(27.2px,5vw,44.8px)/1.2 Georgia,serif;margin:32px 0!important}.theatre-gift-icon{width:112px;height:112px;margin:0 auto 32px;background:transparent}.theatre-gifts .theatre-gift-details{margin-top:40px}.theatre-bank{display:inline-block;border:2px solid #5c2018;padding:22.4px 32px;font-size:12.48px;letter-spacing:2.2464px;line-height:22.464px}.theatre-bank p{margin:12.48px 0;text-transform:uppercase}.theatre-rsvp-wrap{max-width:620px;margin:auto}.theatre-attendance{display:inline-block;margin-bottom:24px!important;padding:10px 24px;border-radius:999px;background:#faf8f5;font-size:12px;letter-spacing:normal}.theatre-deadline{max-width:520px;font:clamp(22.4px,4vw,32px)/1.35 Georgia,serif;margin:-16px auto 28px!important}.theatre-thank-card{max-width:440px;padding:24px;background:#5c2018;border-radius:24px;margin:auto}.theatre-thank-card>div{background:white;padding:clamp(48px,8vw,64px) 40px}.theatre-thank-card p{max-width:310px;line-height:28.8px;margin:0 auto 24px}.theatre-thank-card .script-note{font-size:clamp(32px,5vw,48px);line-height:1.8}.theatre-gifts>.script-note{font-size:clamp(32px,5vw,48px);line-height:normal}.theatre-document footer{height:120px;display:grid;place-items:center;background:#5c2018}.theatre-document footer>.reference-asset{width:112px;height:48px;padding:8.4px 14px;background:transparent}.theatre-music{position:fixed;right:24px;bottom:24px;width:48px;height:48px;border-radius:50%;background:#faf8f5;color:#5c2018;box-shadow:0 10px 25px #5c201838;z-index:20;font-size:24px;border:2px solid #5c2018;transition:transform .25s ease,background .25s ease,color .25s ease}.theatre-music-notice{position:fixed;right:24px;bottom:82px;z-index:20;max-width:250px;background:#faf8f5;padding:12px;font-size:11px}.preserve-lines{white-space:pre-line}
+@media(max-width:600px){.theatre-identity{width:62%}.theatre-scratch{gap:12px}.theatre-counter{gap:12px}.theatre-counter strong{width:64px;height:64px;font-size:25.6px}.theatre-menu-items{transform:translateY(-5.6px)}.theatre-menu-items h3{font-size:16px;line-height:19px;letter-spacing:3.2px}.theatre-menu-items article>p{font-size:12.8px;line-height:17.92px}.theatre-thank-card>div{padding:48px 32px}.theatre-document .display-title{font-size:36px}}
+.theatre-gift-icon:deep(img),.theatre-document footer :deep(img){object-fit:contain}
+@keyframes theatre-pulse{50%{transform:scale(1.04);opacity:.8}}@keyframes theatre-float{50%{transform:translateY(8px)}}
+.theatre-menu>.reference-asset:not(.reference-asset--missing){border:0}.theatre-gift-icon:deep(img),.theatre-document footer :deep(img){object-fit:contain}
+
+.native-family-greeting{font:22px/1.5 Georgia,serif;margin:20px auto;overflow-wrap:anywhere}
 </style>

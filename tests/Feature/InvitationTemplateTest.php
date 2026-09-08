@@ -17,6 +17,36 @@ class InvitationTemplateTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_new_catalog_templates_round_trip_through_customer_selection_and_admin_views(): void
+    {
+        $this->seed(\Database\Seeders\WebgencyTemplateSeeder::class);
+        [$event, $editor] = $this->eventWithEditor();
+        $event->update(['main_date' => now()->addMonth()->toDateString()]);
+        $admin = User::factory()->create(['role' => 'admin']);
+        $outsider = User::factory()->create(['role' => 'customer', 'customer_id' => Customer::create(['name' => 'Other customer'])->id]);
+
+        foreach (Template::orderBy('display_order')->get() as $template) {
+            $this->actingAs($editor)->get(route('events.setup', $event))->assertInertia(fn (Assert $page) => $page
+                ->has('templates', 3));
+            $this->actingAs($outsider)->patch(route('events.setup.save', ['event' => $event, 'step' => 'design']), ['template_id' => $template->id])->assertForbidden();
+            $this->actingAs($editor)->patch(route('events.setup.save', ['event' => $event, 'step' => 'design']), ['template_id' => $template->id, 'settings' => []])->assertSessionHasNoErrors()->assertRedirect();
+            $this->assertSame($template->id, $event->fresh()->template_id);
+            $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page->where('invitations.0.template_name', $template->name));
+            $this->get(route('events.invitation.preview', $event))->assertInertia(fn (Assert $page) => $page
+                ->where('invitation.template.component_key', $template->component_key)->where('invitation.event.host_name', 'Host')
+                ->missing('invitation.media')->missing('invitation.reference_demo'));
+            $this->actingAs($admin)->get(route('events.show', $event))->assertInertia(fn (Assert $page) => $page->where('event.template.name', $template->name));
+            $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page->where('analytics.upcoming.0.template_name', $template->name));
+        }
+        $this->actingAs($admin)->get(route('admin.templates.index'))->assertInertia(fn (Assert $page) => $page->has('templates', 3));
+        $first = Template::first();
+        $first->update(['is_active' => false]);
+        $this->seed(\Database\Seeders\WebgencyTemplateSeeder::class);
+        $this->assertFalse($first->fresh()->is_active);
+        $this->assertSame(3, Template::count());
+        $this->assertNotContains('royal-plum', Template::COMPONENT_KEYS);
+    }
+
     public function test_admin_can_manage_template_metadata_but_customers_cannot_create_templates(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

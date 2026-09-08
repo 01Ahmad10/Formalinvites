@@ -43,7 +43,7 @@ class AdminDashboardAnalytics
             ->count();
 
         $upcomingEvents = Event::query()
-            ->with(['customer', 'package'])
+            ->with(['customer', 'package', 'template:id,name'])
             ->withExists('publications')
             ->where('status', '!=', 'archived')
             ->whereDate('main_date', '>=', today())
@@ -55,6 +55,7 @@ class AdminDashboardAnalytics
                 'id' => $event->id,
                 'title' => $event->title ?: 'Invitation setup',
                 'client' => $event->customer?->name,
+                'template_name' => $event->template?->name,
                 'date' => $event->main_date?->format('M j, Y'),
                 'type' => $event->event_type,
                 'capacity' => $event->effectiveGuestCapacity(),

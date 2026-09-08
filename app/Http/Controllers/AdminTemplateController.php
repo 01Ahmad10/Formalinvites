@@ -16,7 +16,7 @@ class AdminTemplateController extends Controller
     public function index(): Response
     {
         return Inertia::render('Admin/Templates', [
-            'templates' => ($templates = Template::query()->withCount('events')->orderBy('display_order')->orderBy('name')->paginate(25)->withQueryString())->items(),
+            'templates' => ($templates = Template::query()->withCount('events')->orderBy('display_order')->orderBy('name')->paginate(25)->withQueryString())->through(fn (Template $template) => $template->append('demo_url'))->items(),
             'pagination' => ['current_page' => $templates->currentPage(), 'last_page' => $templates->lastPage(), 'total' => $templates->total(), 'prev_page_url' => $templates->previousPageUrl(), 'next_page_url' => $templates->nextPageUrl()],
             'componentKeys' => Template::COMPONENT_KEYS,
             'eventTypes' => Event::TYPES,

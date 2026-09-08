@@ -1,141 +1,57 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-
+import { computed, nextTick, onMounted, onBeforeUnmount, ref } from 'vue';
+import ReferenceAsset from './ReferenceAsset.vue';
+import { familyGreeting, invitationText } from './invitationText';
+import ReferenceRsvpDemo from './ReferenceRsvpDemo.vue';
+import FallingAssetSlots from './FallingAssetSlots.vue';
+import { useReferenceExperience } from './referenceExperience';
 const props = defineProps<{ invitation: any }>();
-
-const headingFamily = computed(() => props.invitation.settings.heading_font === 'modern_sans'
-    ? 'ui-sans-serif, system-ui, sans-serif'
-    : 'ui-serif, Georgia, serif');
-const bodyFamily = computed(() => props.invitation.settings.body_font === 'serif'
-    ? 'ui-serif, Georgia, serif'
-    : 'ui-sans-serif, system-ui, sans-serif');
-const hostLine = computed(() => [props.invitation.event.host_name, props.invitation.event.second_host_name].filter(Boolean).join(' & ') || props.invitation.event.title);
-const showEventTitle = computed(() => props.invitation.event.title?.trim().toLocaleLowerCase() !== hostLine.value.trim().toLocaleLowerCase());
+const t = (text: string) => invitationText(props.invitation, text);
+const root = ref<HTMLElement | null>(null);
+const { names, date, validDate, countdown, enter } = useReferenceExperience(() => props.invitation, root, { revealOffset: 120 });
+const formOpen = ref(false), formPanel = ref<HTMLElement | null>(null);
+const timeline = ref<HTMLElement | null>(null), roseOffset = ref(0);
+let frame = 0;
+function followTimeline() {
+    if (frame) return;
+    frame = requestAnimationFrame(() => { frame = 0; if (!timeline.value || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const box = timeline.value.getBoundingClientRect();
+        const progress = Math.max(0, Math.min(1, (innerHeight / 2 - box.top) / box.height));
+        const travel = Math.max(0, Math.round(box.height) - 85);
+        roseOffset.value = Math.round(progress * travel * 10) / 10;
+    });
+}
+onMounted(() => { window.addEventListener('scroll', followTimeline, {passive:true}); window.addEventListener('resize', followTimeline); followTimeline(); });
+onBeforeUnmount(() => { window.removeEventListener('scroll', followTimeline); window.removeEventListener('resize', followTimeline); cancelAnimationFrame(frame); });
+const demo = computed(() => props.invitation.reference_demo);
+const shortDate = computed(() => validDate.value ? [date.value.getDate(),date.value.getMonth()+1,String(date.value.getFullYear()).slice(-2)].map(n=>String(n).padStart(2,'0')).join('.') : '');
+const venues = computed(() => props.invitation.event.activities?.filter((a:any)=>a.activity_type !== 'meeting_point' && (a.venue || a.location_url)) || []);
+async function openForm() { formOpen.value = true; await nextTick(); formPanel.value?.focus({preventScroll:true}); }
+function mapUrl(venue: string) { return 'https://www.google.com/maps?q=' + encodeURIComponent(venue) + '&output=embed'; }
 </script>
-
 <template>
-    <article
-        class="cinematic-document"
-        :style="{
-            '--cinematic-primary': invitation.settings.primary_color,
-            '--cinematic-secondary': invitation.settings.secondary_color,
-            '--cinematic-accent': invitation.settings.accent_color,
-            '--cinematic-background': invitation.settings.background_color,
-            '--cinematic-text': invitation.settings.text_color,
-            '--cinematic-heading': headingFamily,
-            color: invitation.settings.text_color,
-            fontFamily: bodyFamily,
-        }"
-    >
-        <header class="cinematic-hero">
-            <div class="cinematic-hero-light" aria-hidden="true"></div>
-            <p class="cinematic-eyebrow">{{ invitation.event.event_type || 'Private event' }}</p>
-            <div class="cinematic-hero-identity">
-                <p class="cinematic-chapter">01</p>
-                <div>
-                    <p class="cinematic-prelude">FormalEvites presents</p>
-                    <h1>{{ hostLine }}</h1>
-                    <p v-if="showEventTitle" class="cinematic-event-title">{{ invitation.event.title }}</p>
-                    <p v-if="invitation.party_name" class="cinematic-party">An invitation for {{ invitation.party_name }}</p>
-                </div>
-            </div>
-            <div v-if="invitation.event.main_date || invitation.event.start_time" class="cinematic-hero-date">
-                <span>{{ invitation.event.main_date || 'Date to be confirmed' }}</span>
-                <span v-if="invitation.event.start_time">{{ invitation.event.start_time }}<template v-if="invitation.event.end_time"> – <template v-if="invitation.event.end_date && invitation.event.end_date !== invitation.event.main_date">{{ invitation.event.end_date }}, </template>{{ invitation.event.end_time }}</template></span>
-            </div>
-        </header>
-
-        <div class="cinematic-body">
-            <section v-if="invitation.event.main_date" class="reveal-on-scroll cinematic-date-scene">
-                <p class="cinematic-section-label">02 / THE MOMENT</p>
-                <p class="cinematic-date">{{ invitation.event.main_date }}</p>
-                <p class="cinematic-time">{{ invitation.event.start_time || 'Time to be confirmed' }}<template v-if="invitation.event.end_time"> – <template v-if="invitation.event.end_date && invitation.event.end_date !== invitation.event.main_date">{{ invitation.event.end_date }}, </template>{{ invitation.event.end_time }}</template><span v-if="invitation.event.timezone"> · {{ invitation.event.timezone }}</span></p>
-            </section>
-
-            <section v-if="invitation.event.activities?.length" class="reveal-on-scroll cinematic-section">
-                <div class="cinematic-section-heading"><p class="cinematic-section-label">03 / PROGRAMME</p><h2>The schedule</h2></div>
-                <ol class="cinematic-timeline">
-                    <li v-for="(activity, index) in invitation.event.activities" :key="`${activity.title}-${index}`">
-                        <span class="cinematic-number">{{ String(index + 1).padStart(2, '0') }}</span>
-                        <div class="cinematic-timeline-main">
-                            <h3>{{ activity.title }}</h3>
-                            <p>{{ activity.date }} · {{ activity.start_time }}<template v-if="activity.end_time"> – <template v-if="activity.end_date !== activity.date">{{ activity.end_date }}, </template>{{ activity.end_time }}</template></p>
-                        </div>
-                        <div class="cinematic-timeline-detail">
-                            <p v-if="activity.venue || activity.address">{{ activity.venue }}<template v-if="activity.address"> · {{ activity.address }}</template></p>
-                            <p v-if="activity.description">{{ activity.description }}</p>
-                            <p v-if="activity.location_notes">{{ activity.location_notes }}</p>
-                        </div>
-                    </li>
-                </ol>
-            </section>
-
-            <section v-if="invitation.event.venue || invitation.event.address" class="reveal-on-scroll cinematic-location">
-                <div><p class="cinematic-section-label">04 / LOCATION</p><h2>{{ invitation.event.venue || 'Venue to be confirmed' }}</h2></div>
-                <div class="cinematic-location-copy"><p v-if="invitation.event.address">{{ invitation.event.address }}</p><a v-if="invitation.event.location_url" :href="invitation.event.location_url" target="_blank" rel="noopener noreferrer">Open location <span aria-hidden="true">↗</span></a></div>
-            </section>
-
-            <section v-if="invitation.event.guest_information || invitation.event.dress_code || invitation.event.parking_information || invitation.event.transportation_information || invitation.event.accommodation_information" class="reveal-on-scroll cinematic-section cinematic-notes">
-                <div class="cinematic-section-heading"><p class="cinematic-section-label">05 / DETAILS</p><h2>For your evening</h2></div>
-                <div class="cinematic-notes-grid">
-                    <div v-if="invitation.event.guest_information" class="cinematic-note cinematic-note--wide"><h3>Guest information</h3><p>{{ invitation.event.guest_information }}</p></div>
-                    <div v-if="invitation.event.dress_code" class="cinematic-note"><h3>Dress code</h3><p>{{ invitation.event.dress_code }}</p></div>
-                    <div v-if="invitation.event.parking_information" class="cinematic-note"><h3>Parking</h3><p>{{ invitation.event.parking_information }}</p></div>
-                    <div v-if="invitation.event.transportation_information" class="cinematic-note"><h3>Transportation</h3><p>{{ invitation.event.transportation_information }}</p></div>
-                    <div v-if="invitation.event.accommodation_information" class="cinematic-note"><h3>Accommodation</h3><p>{{ invitation.event.accommodation_information }}</p></div>
-                </div>
-            </section>
-
-            <footer class="reveal-on-scroll cinematic-closing"><span aria-hidden="true"></span><p>We look forward to celebrating with you.</p><strong>{{ hostLine }}</strong></footer>
-        </div>
-    </article>
+<article ref="root" class="reference-document garden-document">
+    <FallingAssetSlots name="petal" :src="invitation.media?.fallingPetal" />
+    <header class="garden-hero"><ReferenceAsset background name="swans-poster.jpg / swans.mp4" :src="invitation.media?.swansPoster" /><video v-if="invitation.media?.swansVideo" :src="invitation.media.swansVideo" :poster="invitation.media.swansPoster" autoplay muted loop playsinline></video><div class="garden-identity"><p data-reveal class="garden-wday">{{ t("Wedding Day") }}</p><p data-reveal class="garden-date">{{ shortDate }}</p><h1 data-reveal>{{ invitation.event.host_name }}<span v-if="invitation.event.second_host_name">&amp;</span><template v-if="invitation.event.second_host_name">{{ invitation.event.second_host_name }}</template></h1><button type="button" class="garden-scroll" @click="enter">Scroll down<span>⌄</span></button></div></header>
+    <section class="garden-section garden-tagline" data-invitation-content><div class="garden-inner"><p data-reveal>United in Love</p></div></section>
+    <section class="garden-section garden-invite"><div class="garden-inner"><ReferenceAsset data-reveal class="garden-monogram" name="Couple monogram" :src="invitation.media?.monogram" /><h2 data-reveal data-family-greeting>{{ familyGreeting(invitation) }}</h2><p data-reveal class="garden-body">{{ invitation.event.description }}</p></div></section>
+    <section v-if="demo?.families" class="garden-section garden-invite"><div class="garden-inner" data-reveal><p class="garden-kicker">Together with their parents</p><p v-for="family in demo.families" :key="family" class="garden-parent">Mr. &amp; Mrs. {{ family }}</p></div></section>
+    <section class="garden-section garden-invite"><div class="garden-inner"><p data-reveal class="garden-body">{{ demo ? 'Request the honor of your presence at the wedding of their son and daughter' : invitation.event.title }}</p></div></section>
+    <section v-if="validDate" class="garden-section garden-count"><div class="garden-inner"><p data-reveal class="garden-kicker">{{ t("The Celebration Begins In") }}</p><div class="garden-counter" data-reveal><template v-for="(value,i) in countdown" :key="i"><span v-if="i" class="garden-colon">:</span><div><strong>{{ value }}</strong><span>{{ t(['Days','Hours','Minutes','Seconds'][i]) }}</span></div></template></div></div></section>
+    <section v-if="invitation.event.activities?.length" class="garden-section garden-schedule"><div class="garden-inner"><div class="garden-ornament-heading" data-reveal><ReferenceAsset name="flourish-left.png" :src="invitation.media?.flourishLeft" /><h2>Schedule of Events</h2><ReferenceAsset name="flourish-right.png" :src="invitation.media?.flourishRight" /></div><div ref="timeline" class="garden-timeline"><ReferenceAsset class="garden-timeline-rose" name="rose-bouquet.png" :src="invitation.media?.roseBouquet" :style="{ transform: `translateY(${roseOffset}px)` }" /><ol><li v-for="(activity,i) in invitation.event.activities" :key="i" data-reveal><time>{{ activity.start_time }}</time><span class="garden-node"></span><div>{{ activity.venue || activity.title }}<p v-if="!demo" class="garden-activity-detail">{{ activity.date }}<template v-if="activity.end_time"> · Until <template v-if="activity.end_date && activity.end_date !== activity.date">{{ activity.end_date }}, </template>{{ activity.end_time }}</template></p><p v-if="activity.description" class="garden-activity-detail">{{ activity.description }}</p><p v-if="activity.location_notes" class="garden-activity-detail">{{ activity.location_notes }}</p></div></li></ol></div></div></section>
+    <section v-if="venues.length || invitation.event.venue" class="garden-section garden-location"><div class="garden-inner"><h2 data-reveal>Location</h2><ReferenceAsset class="garden-rose" name="flourish-right.png" :src="invitation.media?.flourishRight" /><article v-for="(activity,i) in venues" :key="i" class="garden-location-block"><p data-reveal class="garden-kicker">{{ activity.title }}</p><h3 data-reveal>{{ activity.venue }}</h3><div v-if="demo" data-reveal class="garden-map"><iframe :title="`Map: ${activity.venue}`" :src="mapUrl(activity.venue)" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div><template v-else><p class="garden-body">{{ activity.address }}</p><a v-if="activity.location_url" :href="activity.location_url" target="_blank" rel="noopener noreferrer" class="garden-directions">{{ t("Directions \u2197") }}</a></template></article><article v-if="(invitation.event.venue || invitation.event.address) && !venues.some((a: any) => a.venue === invitation.event.venue && a.address === invitation.event.address)" class="garden-location-block"><h3>{{ invitation.event.venue }}</h3><p>{{ invitation.event.address }}</p><a v-if="invitation.event.location_url" :href="invitation.event.location_url" target="_blank" rel="noopener noreferrer" class="garden-directions">{{ t("Directions \u2197") }}</a></article></div></section>
+    <section v-if="[invitation.event.dress_code,invitation.event.guest_information,invitation.event.parking_information,invitation.event.transportation_information,invitation.event.accommodation_information].some(Boolean)" class="garden-section garden-detail"><div class="garden-inner" data-reveal><h2>{{ invitation.event.dress_code ? t('Dress Code') : t('Guest information') }}</h2><p class="garden-attire">{{ invitation.event.dress_code }}</p><template v-if="demo"><p class="garden-detail-copy">oin us in your finest formal and colorful attire</p><p class="garden-dress-note">Kindly Avoid Wearing White or Black</p></template><p v-for="(note,i) in [invitation.event.guest_information,invitation.event.parking_information,invitation.event.transportation_information,invitation.event.accommodation_information].filter(Boolean)" :key="i" class="garden-body">{{ note }}</p></div></section>
+    <section data-section="story" v-if="invitation.content?.story_enabled" class="garden-section"><div class="garden-inner" data-reveal><h2>{{ invitation.content.story_heading || t('Our Story') }}</h2><p class="garden-body garden-story">{{ invitation.content.story_body }}</p></div></section>
+    <section data-section="gifts" v-if="invitation.content?.gift_registry_enabled" class="garden-section garden-detail garden-gifts"><ReferenceAsset class="garden-floral garden-floral-top" name="floral-a.png" :src="invitation.media?.floral" /><ReferenceAsset class="garden-floral garden-floral-bottom" name="floral-a.png" :src="invitation.media?.floral" /><div class="garden-inner" data-reveal><h2>{{ t("Gift Registry") }}</h2><p class="garden-detail-copy">{{ invitation.content.gift_registry_intro }}</p><div class="garden-gift-cards"><article v-for="(method,i) in invitation.gift_methods" :key="i"><h3>{{ method.label }}</h3><p>{{ method.details }}</p><a v-if="method.external_url" :href="method.external_url" target="_blank" rel="noopener noreferrer">{{ t("View registry \u2197") }}</a></article></div></div></section>
+    <section class="garden-section garden-detail garden-rsvp"><div class="garden-inner"><h2 data-reveal>{{ t("Confirm your attendance") }}</h2><p class="garden-body" data-reveal>{{ t("Will you be joining the celebration?") }}<template v-if="invitation.event.rsvp_deadline"> Kindly confirm before {{ invitation.event.rsvp_deadline }}.</template></p><button v-if="!formOpen" class="garden-seal" type="button" aria-label="Confirm your attendance" :aria-expanded="formOpen" @click="openForm"><ReferenceAsset name="wax-seal.png" :src="invitation.media?.waxSeal" /><span>⌄</span><small>{{ t("Click to open") }}</small></button><div v-else ref="formPanel" tabindex="-1" class="garden-form"><slot><ReferenceRsvpDemo variant="cinematic" /></slot></div></div></section>
+    <section data-section="ending" v-if="invitation.content?.ending_enabled !== false" class="garden-section garden-ending"><div class="garden-inner"><p data-reveal>{{ invitation.content?.ending_message || '♡ Happily Ever After ♡' }}</p><h2 data-reveal>{{ invitation.content?.ending_title || names }}</h2></div></section><footer><span class="template-footer-brand">FormalEvites</span></footer>
+</article>
 </template>
-
 <style scoped>
-.cinematic-document { container-type: inline-size; max-width: 100%; overflow: hidden; background: var(--cinematic-background); border: 1px solid color-mix(in srgb, var(--cinematic-primary) 38%, transparent); box-shadow: 0 2rem 6rem rgba(0, 0, 0, 0.36); }
-.cinematic-document :is(h1, h2, h3, p, a) { min-width: 0; overflow-wrap: anywhere; }
-.cinematic-hero { position: relative; min-height: min(74rem, 88vh); padding: clamp(2rem, 7vw, 7rem); overflow: hidden; background: linear-gradient(135deg, color-mix(in srgb, var(--cinematic-secondary) 58%, #050609), var(--cinematic-background) 58%, #000); }
-.cinematic-hero::before, .cinematic-hero::after { position: absolute; content: ''; pointer-events: none; }
-.cinematic-hero::before { inset: 1.3rem; border: 1px solid color-mix(in srgb, var(--cinematic-primary) 32%, transparent); }
-.cinematic-hero::after { right: -18%; bottom: -24%; width: min(52rem, 90cqi); aspect-ratio: 1; border: 1px solid color-mix(in srgb, var(--cinematic-primary) 26%, transparent); border-radius: 50%; box-shadow: 0 0 0 2.5rem color-mix(in srgb, var(--cinematic-primary) 4%, transparent), 0 0 0 7rem color-mix(in srgb, var(--cinematic-primary) 3%, transparent); }
-.cinematic-hero-light { position: absolute; top: -35%; left: 34%; width: min(45rem, 88cqi); aspect-ratio: 1; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, color-mix(in srgb, var(--cinematic-primary) 17%, transparent), transparent 64%); filter: blur(3rem); }
-.cinematic-eyebrow, .cinematic-section-label { position: relative; z-index: 1; margin: 0; color: var(--cinematic-primary); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; }
-.cinematic-hero-identity { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(4rem, 0.36fr) minmax(0, 1fr); gap: clamp(1.5rem, 5vw, 5rem); align-items: start; margin-top: clamp(6rem, 16vw, 13rem); }
-.cinematic-chapter { margin: -0.16em 0 0; color: color-mix(in srgb, var(--cinematic-text) 20%, transparent); font-family: var(--cinematic-heading); font-size: clamp(5rem, 15cqi, 12rem); line-height: 0.75; }
-.cinematic-prelude { margin: 0; color: color-mix(in srgb, var(--cinematic-text) 62%, transparent); font-size: 0.82rem; letter-spacing: 0.13em; text-transform: uppercase; }
-.cinematic-hero h1 { max-width: 11ch; margin: 1rem 0 0; color: var(--cinematic-text); font-family: var(--cinematic-heading); font-size: clamp(3.4rem, 8.5cqi, 8.8rem); font-weight: 400; line-height: 0.88; letter-spacing: -0.055em; }
-.cinematic-event-title { max-width: 28ch; margin: 1.8rem 0 0; color: color-mix(in srgb, var(--cinematic-text) 82%, transparent); font-size: clamp(1rem, 1.6cqi, 1.35rem); line-height: 1.45; }
-.cinematic-party { margin: 2rem 0 0; color: var(--cinematic-primary); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.17em; text-transform: uppercase; }
-.cinematic-hero-date { position: absolute; z-index: 1; right: clamp(2rem, 7vw, 7rem); bottom: clamp(2rem, 6vw, 6rem); display: flex; max-width: calc(100% - 4rem); flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem 1.2rem; color: color-mix(in srgb, var(--cinematic-text) 82%, transparent); font-size: 0.82rem; letter-spacing: 0.08em; text-align: right; text-transform: uppercase; }
-.cinematic-body { background: linear-gradient(180deg, color-mix(in srgb, var(--cinematic-background) 90%, #111827), var(--cinematic-background)); }
-.cinematic-date-scene, .cinematic-section, .cinematic-location { position: relative; padding: clamp(3rem, 8vw, 8rem) clamp(2rem, 7vw, 7rem); }
-.cinematic-date-scene { background: color-mix(in srgb, var(--cinematic-secondary) 40%, var(--cinematic-background)); border-top: 1px solid color-mix(in srgb, var(--cinematic-primary) 25%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--cinematic-primary) 25%, transparent); }
-.cinematic-date { max-width: 11ch; margin: 1.8rem 0 0; color: var(--cinematic-text); font-family: var(--cinematic-heading); font-size: clamp(3rem, 7.5cqi, 7rem); font-weight: 400; line-height: 0.88; letter-spacing: -0.045em; }
-.cinematic-time { margin: 1.5rem 0 0; color: color-mix(in srgb, var(--cinematic-text) 78%, transparent); font-size: clamp(0.88rem, 1.7cqi, 1.1rem); line-height: 1.6; }
-.cinematic-time span { color: var(--cinematic-primary); }
-.cinematic-section-heading { display: grid; grid-template-columns: minmax(10rem, 0.7fr) 2fr; gap: 1.5rem; align-items: baseline; }
-.cinematic-section-heading h2, .cinematic-location h2 { margin: 0; color: var(--cinematic-text); font-family: var(--cinematic-heading); font-size: clamp(2.5rem, 5.2cqi, 4.8rem); font-weight: 400; line-height: 0.92; letter-spacing: -0.04em; }
-.cinematic-timeline { margin: clamp(2.5rem, 5vw, 5rem) 0 0; padding: 0; border-top: 1px solid color-mix(in srgb, var(--cinematic-text) 18%, transparent); list-style: none; }
-.cinematic-timeline li { display: grid; grid-template-columns: 4rem minmax(10rem, 1fr) minmax(12rem, 0.9fr); gap: clamp(1rem, 3vw, 3rem); padding: clamp(1.7rem, 3vw, 2.7rem) 0; border-bottom: 1px solid color-mix(in srgb, var(--cinematic-text) 16%, transparent); }
-.cinematic-number { color: var(--cinematic-primary); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.15em; }
-.cinematic-timeline h3 { margin: 0; color: var(--cinematic-text); font-family: var(--cinematic-heading); font-size: clamp(1.5rem, 2.7cqi, 2.35rem); font-weight: 400; line-height: 1; }
-.cinematic-timeline p { margin: 0.65rem 0 0; color: color-mix(in srgb, var(--cinematic-text) 70%, transparent); font-size: 0.9rem; line-height: 1.6; }
-.cinematic-timeline-detail p + p { margin-top: 0.75rem; }
-.cinematic-location { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.8fr); gap: clamp(2rem, 8vw, 8rem); background: linear-gradient(135deg, color-mix(in srgb, var(--cinematic-secondary) 48%, var(--cinematic-background)), var(--cinematic-background)); border-top: 1px solid color-mix(in srgb, var(--cinematic-primary) 22%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--cinematic-primary) 22%, transparent); }
-.cinematic-location-copy { align-self: end; color: color-mix(in srgb, var(--cinematic-text) 78%, transparent); line-height: 1.65; }
-.cinematic-location-copy p { margin: 0; white-space: pre-line; }
-.cinematic-location-copy a { display: inline-flex; gap: 0.6rem; margin-top: 1.5rem; color: var(--cinematic-primary); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-decoration: none; text-transform: uppercase; }
-.cinematic-location-copy a:focus-visible { outline: 3px solid color-mix(in srgb, var(--cinematic-primary) 65%, transparent); outline-offset: 4px; }
-.cinematic-notes { background: color-mix(in srgb, var(--cinematic-background) 86%, #070707); }
-.cinematic-notes-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: clamp(2.5rem, 5vw, 5rem); border-top: 1px solid color-mix(in srgb, var(--cinematic-text) 16%, transparent); }
-.cinematic-note { padding: 1.6rem 1.4rem 1.6rem 0; border-bottom: 1px solid color-mix(in srgb, var(--cinematic-text) 16%, transparent); }
-.cinematic-note:nth-child(even) { padding-right: 0; padding-left: 1.4rem; border-left: 1px solid color-mix(in srgb, var(--cinematic-text) 16%, transparent); }
-.cinematic-note--wide { grid-column: 1 / -1; padding-right: 0; }
-.cinematic-note h3 { margin: 0; color: var(--cinematic-primary); font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; }
-.cinematic-note p { margin: 0.85rem 0 0; color: color-mix(in srgb, var(--cinematic-text) 76%, transparent); line-height: 1.65; white-space: pre-line; }
-.cinematic-closing { padding: clamp(5rem, 12vw, 11rem) clamp(2rem, 7vw, 7rem); background: #050609; text-align: center; }
-.cinematic-closing > span { display: block; width: min(12rem, 38%); height: 1px; margin: 0 auto 1.8rem; background: var(--cinematic-primary); }
-.cinematic-closing p { margin: 0; color: color-mix(in srgb, var(--cinematic-text) 70%, transparent); font-family: var(--cinematic-heading); font-size: clamp(1.2rem, 2.1cqi, 1.7rem); font-style: italic; }
-.cinematic-closing strong { display: block; margin-top: 0.65rem; color: var(--cinematic-text); font-family: var(--cinematic-heading); font-size: clamp(2rem, 3.8cqi, 3.5rem); font-weight: 400; }
-@container (max-width: 46rem) { .cinematic-hero { min-height: 42rem; padding: 2rem clamp(1.5rem, 7cqi, 3rem) 3rem; } .cinematic-hero::before { inset: 0.85rem; } .cinematic-hero-identity, .cinematic-section-heading, .cinematic-location { grid-template-columns: 1fr; } .cinematic-hero-identity { gap: 2rem; margin-top: 5rem; } .cinematic-chapter { font-size: clamp(5rem, 15cqi, 7rem); } .cinematic-hero h1 { font-size: clamp(3.1rem, 10cqi, 4.8rem); } .cinematic-hero-date { position: relative; right: auto; bottom: auto; justify-content: flex-start; margin-top: 4rem; text-align: left; } .cinematic-date-scene, .cinematic-section, .cinematic-location { padding: clamp(2.7rem, 7cqi, 4rem) clamp(1.5rem, 7cqi, 3rem); } .cinematic-timeline li { grid-template-columns: 2.5rem minmax(0, 1fr); gap: 0.7rem; } .cinematic-timeline-detail { grid-column: 2; } .cinematic-notes-grid { grid-template-columns: 1fr; } .cinematic-note, .cinematic-note:nth-child(even) { padding: 1.4rem 0; border-left: 0; } .cinematic-note--wide { grid-column: auto; } .cinematic-closing { padding: 5rem clamp(1.5rem, 7cqi, 3rem); } }
+.garden-document{background:#f9f0e0;color:#4f4638;font:16px/normal Ovo,Georgia,serif;text-align:center;overflow:hidden}.garden-document [data-reveal]{transform:translateY(100px);transition-duration:1s}.garden-document .garden-wday[data-reveal],.garden-document .garden-date[data-reveal]{transform:translateY(-100px)}.garden-document [data-reveal].arrived{transform:translateZ(0)}.garden-document h2{font:700 41.6px/1 'Invitation Vibes',cursive;color:#b48c3d;margin-bottom:20px}.garden-hero{position:relative;isolation:isolate;min-height:100svh;padding:20vh 24px 32px;overflow:hidden}.garden-hero video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;z-index:-1}.garden-identity{position:relative;margin:auto;width:max-content;max-width:100%;color:#a67d2b}.garden-wday{font:32px 'Invitation Vibes',cursive}.garden-date{margin-top:1.6px!important;font:19.2px Cinzel,serif;letter-spacing:2.88px;transition-delay:.1s!important}.garden-identity h1{margin-top:32px;font:57.6px/.98 'Invitation Vibes',cursive;transition-duration:1.2s!important;transition-delay:.2s!important}.garden-identity h1 span{display:block;margin:1.6px 0;font-size:32px;line-height:.98}.garden-scroll{display:block;margin:36px auto 0;font:25.6px 'Invitation Vibes',cursive}.garden-scroll span{display:block;font:16px/20px 'Invitation Vibes',cursive;margin-top:-3.2px}.garden-section{padding:56px 24px;position:relative;display:flow-root}.garden-inner{max-width:480px;margin:auto;position:relative}.garden-tagline{padding-bottom:0}.garden-tagline p{font:36.8px/42.32px 'Invitation Vibes',cursive;color:#a67d2b;margin:36.8px 0}.garden-invite{padding-top:0}.garden-monogram{width:80px;height:80px;margin:0 auto 40px;opacity:.9;background:transparent;border:1px dashed #a67d2b66}.garden-body{font-size:16.32px;line-height:30.192px;margin:8px 0!important}.garden-kicker{font:11.52px/15px Cinzel,serif;letter-spacing:1.4px;text-transform:uppercase;color:#b48c3d;margin:11.52px 0 20px!important}.garden-parent{font:18.4px/25px Cinzel,serif;margin-bottom:6.4px!important}.garden-counter{display:flex;justify-content:center;gap:8px}.garden-counter>div{width:51.2px}.garden-counter strong{display:block;font:400 33.6px/1 Cinzel,serif}.garden-counter>div>span{display:block;font:8.96px/12px Cinzel,serif;letter-spacing:1.0752px;color:#8a7f6d;text-transform:uppercase;margin-top:6.4px}.garden-colon{font:27.2px Cinzel,serif;color:#a67d2b}.garden-ornament-heading{display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:20px}.garden-ornament-heading h2{margin:0}.garden-ornament-heading>.reference-asset{width:48px;height:24.91px;flex-shrink:0;opacity:.85;background:transparent}.garden-ornament-heading :deep(.reference-asset__label){inset:0;font-size:5px;border:1px dashed #a67d2b66;background:transparent}.garden-timeline{max-width:352px;position:relative;padding:0;margin:24px auto 0}.garden-timeline ol{list-style:none;padding:0;margin:0}.garden-timeline-rose{position:relative;z-index:2;transition:transform .12s linear;width:67.2px;height:61.64px;margin:0 auto 6.4px;background:transparent;border:1px dashed #a67d2b66;pointer-events:none}.garden-timeline-rose:deep(.reference-asset__label){font-size:6px;inset:0;background:#f9f0e0aa}.garden-timeline::before{content:"";position:absolute;top:51.2px;bottom:22.4px;left:50%;width:1px;background:#a67d2b}.garden-timeline li{display:grid;grid-template-columns:1fr 35.2px 1fr;gap:8px;align-items:center;padding:13.6px 0;position:relative;text-align:start;min-height:52px}.garden-timeline time{text-align:end;font:18.4px/25px Cinzel,serif}.garden-node{position:relative;width:9.6px;height:9.6px;transform:rotate(45deg);background:#4f4638;justify-self:center}.garden-timeline li>div{font-size:16.8px;line-height:19px}.garden-activity-detail{font-size:13px;color:#8a7f6d;line-height:1.5;margin-top:5px!important}.garden-location h2{margin-bottom:8px}.garden-rose{width:128px;height:67.28px;margin:8px auto 24px;opacity:.75;background:transparent}.garden-location-block h3{font:22.4px/30px Cinzel,serif;margin:0 0 6.4px}.garden-location-block+.garden-location-block{margin-top:36px;padding-top:28px;border-top:1px solid #a67d2b44}.garden-map{max-width:416px;height:259.6px;margin:28px auto 0;padding:8.8px;border:1px solid #a67d2b;border-radius:6.4px}.garden-map iframe{border:0;width:100%;height:240px;display:block}.garden-directions{display:inline-block;text-decoration:underline;margin:20px}.garden-detail{background:#f6f1e8}.garden-detail h2{margin-bottom:14.4px}.garden-attire{font:32px 'Invitation Vibes',cursive;color:#a67d2b;margin-bottom:6.4px!important}.garden-detail-copy{font-size:16.32px;line-height:29.376px;margin:16.32px 0!important}.garden-dress-note{font-size:13.6px;color:#8a7f6d;margin:9.6px 0 13.6px!important}.garden-floral{position:absolute;width:136px;height:208.2px;max-width:40%;background:transparent;border:1px dashed #a67d2b33;pointer-events:none}.garden-floral-top{top:-8px;right:-12px;transform:scaleX(-1)}.garden-floral-bottom{bottom:-8px;left:-12px;transform:scaleY(-1)}.garden-floral:deep(.reference-asset__label){inset:auto 0 8px;transform:scaleX(-1);font-size:7px}.garden-floral-bottom:deep(.reference-asset__label){transform:scaleY(-1)}.garden-gift-cards{display:grid;gap:14.4px;margin-top:20px}.garden-gift-cards article{border:1px solid #a67d2b66;border-radius:8px;padding:16px 20px;background:#fff6}.garden-gift-cards h3{font:15.2px/21px Cinzel,serif;color:#b48c3d;margin-bottom:5.6px}.garden-gift-cards p{font-size:14.72px;line-height:17px;margin:1.6px 0}.garden-rsvp h2{margin-bottom:20px;font-weight:700}.garden-seal{display:block;width:176px;margin:16px auto 0;padding:5.6px 16px 8px}.garden-seal>.reference-asset{filter:drop-shadow(0 8px 16px #4a0d1666);width:120px;height:90px;margin:auto;background:transparent;border:1px dashed #a67d2b66}.garden-seal>span{display:block;font:19.2px/24px 'Invitation Vibes',cursive;color:#a67d2b;margin-top:2.4px}.garden-seal small{font:24px/30px 'Invitation Vibes',cursive;color:#a67d2b;display:block}.garden-form{margin:24px auto 0;max-width:384px;outline:none}.garden-ending{background:#e8ddcf;padding-bottom:0}.garden-ending p{font:38.4px/normal 'Invitation Vibes',cursive;color:#a67d2b;margin:38.4px 0}.garden-ending h2{font:24px/32px Cinzel,serif;color:#b48c3d;letter-spacing:.72px;margin:8px 0 0}.garden-document footer{display:grid;place-items:center;background:#e8ddcf;padding:32px 24px}.garden-document footer>.reference-asset{width:112px;height:48px;padding:8.4px 14px;background:transparent}.garden-story{white-space:pre-line}
+@media(max-width:400px){.garden-timeline{max-width:320px}.garden-document h2{font-size:35.2px}.garden-identity h1{font-size:48px}.garden-ending h2{font-size:24px}}
+.garden-count .garden-kicker,.garden-location .garden-kicker{letter-spacing:3.2256px}.garden-ornament-heading>.reference-asset:last-child{height:25.22px}.garden-monogram:deep(img),.garden-rose:deep(img),.garden-ornament-heading :deep(img),.garden-document footer :deep(img){object-fit:contain}.garden-invite:has(.garden-monogram) .garden-body,.garden-counter,.garden-ending h2{transition-delay:.1s}
+@media(prefers-reduced-motion:reduce){.garden-document [data-reveal]{transform:none}}
+.garden-timeline-rose:not(.reference-asset--missing),.garden-floral:not(.reference-asset--missing),.garden-seal>.reference-asset:not(.reference-asset--missing){border:0}.garden-timeline-rose:deep(img),.garden-floral:deep(img),.garden-seal :deep(img){object-fit:contain}
+.garden-document footer .template-footer-brand{display:grid;place-items:center;min-width:112px;min-height:48px}
 </style>

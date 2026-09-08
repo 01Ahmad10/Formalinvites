@@ -148,7 +148,7 @@ class EventPublicationTest extends TestCase
 
         $this->actingAs($owner)->patch(route('events.setup.save', [$event, 'rsvp']), ['rsvp_deadline' => '2027-10-10'])->assertRedirect(route('events.setup', ['event' => $event, 'step' => 4]));
         $this->actingAs($owner)->patch(route('events.setup.save', [$event, 'design']), ['template_id' => $template->id, 'settings' => ['palette_key' => 'not-trusted']])->assertSessionHasErrors('settings.palette_key');
-        $this->actingAs($owner)->patch(route('events.setup.save', [$event, 'design']), ['template_id' => $template->id, 'settings' => []])->assertRedirect(route('events.setup', ['event' => $event, 'step' => 5]));
+        $this->actingAs($owner)->patch(route('events.setup.save', [$event, 'design']), ['template_id' => $template->id, 'settings' => []])->assertRedirect(route('events.setup', ['event' => $event, 'step' => 2]));
         $this->assertDatabaseHas('events', ['id' => $event->id, 'template_id' => $template->id]);
     }
 
@@ -156,7 +156,7 @@ class EventPublicationTest extends TestCase
     {
         [$event, $owner] = $this->eventWithUsers(['title' => null, 'event_type' => null, 'host_name' => null, 'main_date' => null, 'start_time' => null, 'rsvp_deadline' => null, 'template_id' => null]);
 
-        foreach ([1, 2, 3, 4, 5] as $step) {
+        foreach ([1, 2] as $step) {
             $this->actingAs($owner)->get(route('events.setup', ['event' => $event, 'step' => $step]))
                 ->assertInertia(fn (Assert $page) => $page
                     ->component('Events/Setup')

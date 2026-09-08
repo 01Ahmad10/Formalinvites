@@ -1,104 +1,67 @@
 <script setup lang="ts">
-defineProps<{ invitation: any }>();
+import { computed, ref } from 'vue';
+import { familyGreeting, invitationText } from './invitationText';
+import ReferenceAsset from './ReferenceAsset.vue';
+import ReferenceGifts from './ReferenceGifts.vue';
+import ReferenceRsvpDemo from './ReferenceRsvpDemo.vue';
+import FallingAssetSlots from './FallingAssetSlots.vue';
+import { useReferenceExperience } from './referenceExperience';
+const props = defineProps<{ invitation: any }>();
+const t = (text: string) => invitationText(props.invitation, text);
+const root = ref<HTMLElement | null>(null);
+const { names, date, dateLabel, month, days, countdown, enter } = useReferenceExperience(() => props.invitation, root);
+const demo = computed(() => props.invitation.reference_demo);
+const meeting = computed(() => props.invitation.event.activities?.filter((a: any) => a.activity_type === 'meeting_point') || []);
+const celebration = computed(() => props.invitation.event.activities?.filter((a: any) => a.activity_type !== 'meeting_point') || []);
 </script>
-
 <template>
-    <article class="romantic-invitation-document" :style="{ color: invitation.settings.text_color }">
-        <header class="romantic-hero" :style="{ backgroundColor: invitation.settings.background_color }">
-            <svg aria-hidden="true" viewBox="0 0 180 180" class="hero-botanical hero-botanical--top"><path fill="currentColor" d="M90 0c10 48 28 79 78 108-51 7-78 28-93 72 0-48-22-82-75-105C44 67 73 42 90 0Z"/><path fill="none" stroke="currentColor" stroke-width="2" d="M21 22c57 43 74 88 67 144M68 57C41 47 24 54 8 77M78 91c33-7 57 9 75 36"/></svg>
-            <svg aria-hidden="true" viewBox="0 0 180 180" class="hero-botanical hero-botanical--bottom"><path fill="currentColor" d="M90 0c10 48 28 79 78 108-51 7-78 28-93 72 0-48-22-82-75-105C44 67 73 42 90 0Z"/><path fill="none" stroke="currentColor" stroke-width="2" d="M21 22c57 43 74 88 67 144M68 57C41 47 24 54 8 77M78 91c33-7 57 9 75 36"/></svg>
-            <p v-if="invitation.event.event_type" class="romantic-eyebrow">{{ invitation.event.event_type }}</p>
-            <p class="romantic-intro-line">Together with their families</p>
-            <h1 class="romantic-hosts" :style="{ color: invitation.settings.primary_color }">{{ invitation.event.host_name }}<span v-if="invitation.event.second_host_name"> <span aria-hidden="true" class="romantic-ampersand">&amp;</span> {{ invitation.event.second_host_name }}</span></h1>
-            <p v-if="invitation.party_name" class="romantic-party">Invitation for <strong>{{ invitation.party_name }}</strong></p>
-            <span class="romantic-rule" :style="{ backgroundColor: invitation.settings.accent_color }"></span>
-            <h2 class="romantic-event-title">{{ invitation.event.title }}</h2>
-        </header>
-
-        <div class="romantic-document-body">
-            <section v-if="invitation.event.main_date" class="reveal-on-scroll romantic-date-section">
-                <p class="romantic-eyebrow">Save the date</p>
-                <p class="romantic-date">{{ invitation.event.main_date }}</p>
-                <p v-if="invitation.event.start_time || invitation.event.end_time" class="romantic-time">{{ invitation.event.start_time || 'Time to be confirmed' }}<span v-if="invitation.event.end_time"> – <span v-if="invitation.event.end_date && invitation.event.end_date !== invitation.event.main_date">{{ invitation.event.end_date }}, </span>{{ invitation.event.end_time }}</span></p>
-                <p class="romantic-timezone">{{ invitation.event.timezone }}</p>
-            </section>
-
-            <section v-if="invitation.event.activities?.length" class="reveal-on-scroll romantic-section">
-                <div class="romantic-section-heading"><p class="romantic-eyebrow">The celebration</p><h2>Schedule</h2></div>
-                <ol class="romantic-timeline">
-                    <li v-for="(activity, index) in invitation.event.activities" :key="`${activity.title}-${index}`">
-                        <span class="romantic-timeline-dot" :style="{ backgroundColor: invitation.settings.accent_color }"></span>
-                        <h3>{{ activity.title }}</h3>
-                        <p class="romantic-meta">{{ activity.date }} · {{ activity.start_time }}<span v-if="activity.end_time"> – <span v-if="activity.end_date !== activity.date">{{ activity.end_date }}, </span>{{ activity.end_time }}</span></p>
-                        <p v-if="activity.venue || activity.address" class="romantic-meta">{{ activity.venue }}<span v-if="activity.address"> · {{ activity.address }}</span></p>
-                        <p v-if="activity.description" class="romantic-copy">{{ activity.description }}</p>
-                    </li>
-                </ol>
-            </section>
-
-            <section v-if="invitation.event.venue || invitation.event.address" class="reveal-on-scroll romantic-location">
-                <p class="romantic-eyebrow">Location</p>
-                <h2>{{ invitation.event.venue || 'Venue to be confirmed' }}</h2>
-                <p v-if="invitation.event.address" class="romantic-copy">{{ invitation.event.address }}</p>
-                <a v-if="invitation.event.location_url" :href="invitation.event.location_url" target="_blank" rel="noopener noreferrer" class="romantic-location-link">Open location <span aria-hidden="true">→</span></a>
-            </section>
-
-            <section v-if="invitation.event.dress_code || invitation.event.parking_information || invitation.event.transportation_information || invitation.event.accommodation_information || invitation.event.guest_information" class="reveal-on-scroll romantic-details">
-                <div v-if="invitation.event.guest_information" class="romantic-detail-card romantic-detail-card--wide"><h2>Guest information</h2><p>{{ invitation.event.guest_information }}</p></div>
-                <div v-if="invitation.event.dress_code" class="romantic-detail-card"><h2>Dress code</h2><p>{{ invitation.event.dress_code }}</p></div>
-                <div v-if="invitation.event.parking_information" class="romantic-detail-card"><h2>Parking</h2><p>{{ invitation.event.parking_information }}</p></div>
-                <div v-if="invitation.event.transportation_information" class="romantic-detail-card"><h2>Transportation</h2><p>{{ invitation.event.transportation_information }}</p></div>
-                <div v-if="invitation.event.accommodation_information" class="romantic-detail-card"><h2>Accommodation</h2><p>{{ invitation.event.accommodation_information }}</p></div>
-            </section>
-
-            <footer v-if="invitation.event.host_name" class="reveal-on-scroll romantic-closing">
-                <span class="romantic-rule" :style="{ backgroundColor: invitation.settings.accent_color }"></span>
-                <p>With love,</p>
-                <p class="romantic-closing-names">{{ invitation.event.host_name }}<span v-if="invitation.event.second_host_name"> &amp; {{ invitation.event.second_host_name }}</span></p>
-            </footer>
+<article ref="root" class="reference-document coast-document">
+    <FallingAssetSlots name="leaf" :src="invitation.media?.fallingLeaf" />
+    <header class="coast-opening">
+        <ReferenceAsset background name="opening-couple.webp" :src="invitation.media?.opening" />
+        <div class="opening-shade"></div>
+        <div class="coast-identity" data-reveal><h1>{{ invitation.event.host_name }}<span v-if="invitation.event.second_host_name">&amp;</span><template v-if="invitation.event.second_host_name">{{ invitation.event.second_host_name }}</template></h1><p>{{ dateLabel }}</p></div>
+        <button type="button" class="coast-open" @click="enter">{{ t("Open invitation") }} <span>↓</span></button>
+    </header>
+    <section class="coast-page coast-details" data-invitation-content>
+        <ReferenceAsset background name="paper-sea.webp" :src="invitation.media?.paperSea" />
+        <div class="coast-details-panel" data-reveal>
+            <ReferenceAsset class="coast-monogram" name="Couple monogram" :src="invitation.media?.monogram" />
+            <p v-if="invitation.party_name" class="native-family-greeting" data-family-greeting>{{ familyGreeting(invitation) }}</p><p class="coast-quote">{{ invitation.event.description }}</p>
+            <div v-if="demo?.families" class="coast-families"><p v-for="family in demo.families" :key="family">Mr. &amp; Mrs.<span>{{ family }}</span></p></div>
+            <p v-if="demo" class="coast-request">Request the honor of your presence at the wedding of their son and daughter</p>
+            <p v-else class="coast-request">{{ invitation.event.title }}</p>
         </div>
-    </article>
+    </section>
+    <section v-if="dateLabel" class="coast-page coast-countdown">
+        <ReferenceAsset background name="paper-coast.webp" :src="invitation.media?.paperCoast" />
+        <div data-reveal><h2>{{ t("The Celebration Begins In") }}</h2><div class="coast-counter"><div v-for="(value, i) in countdown" :key="i"><strong>{{ value }}</strong><span>{{ t(['Days','Hours','Minutes','Seconds'][i]) }}</span></div></div><p class="coast-countdown-note">{{ t("We can't wait to celebrate with you!") }}</p>
+        <div class="coast-calendar"><p>{{ month }}</p><div><b v-for="day in ['Su','Mo','Tu','We','Th','Fr','Sa']" :key="day">{{ day }}</b><span v-for="(day, i) in days" :key="i" :class="{ chosen: day === date.getDate() }">{{ day }}<i v-if="day === date.getDate()">♡</i></span></div></div></div>
+    </section>
+    <section v-if="meeting.length" class="coast-page coast-meeting">
+        <ReferenceAsset background name="paper-sea.webp" :src="invitation.media?.paperSea" />
+        <div data-reveal><h2>{{ t("Meeting Point") }}</h2><div class="coast-meeting-grid"><article v-for="(activity, i) in meeting" :key="i" class="coast-card"><ReferenceAsset class="coast-small-icon" :name="i === 0 ? 'groom.svg' : 'bride.svg'" :src="i === 0 ? invitation.media?.groomIcon : invitation.media?.brideIcon" /><p class="coast-side">{{ activity.title }}</p><h3>{{ activity.venue }}</h3><p>{{ activity.start_time }}</p><a v-if="activity.location_url" :href="activity.location_url" target="_blank" rel="noopener noreferrer">{{ t("View on map \u2197") }}</a></article></div></div>
+    </section>
+    <section v-if="celebration.length || invitation.event.venue" class="coast-page coast-celebration">
+        <ReferenceAsset background name="paper-coast-corner.webp" :src="invitation.media?.paperCorner" />
+        <div data-reveal><h2>{{ t("Celebration") }}</h2><div class="coast-celebration-grid"><article v-for="(activity, i) in celebration" :key="i" class="coast-card"><ReferenceAsset class="coast-small-icon" :name="i === 0 ? 'Ceremony icon' : 'Celebration icon'" /><h3>{{ activity.venue || activity.title }}<template v-if="activity.start_time"> - {{ activity.start_time }}</template></h3><p v-if="!demo">{{ activity.date }}<template v-if="activity.end_time"> · Until <template v-if="activity.end_date && activity.end_date !== activity.date">{{ activity.end_date }}, </template>{{ activity.end_time }}</template></p><p v-if="activity.address">{{ activity.address }}</p><p v-if="activity.description">{{ activity.description }}</p><p v-if="activity.location_notes">{{ activity.location_notes }}</p><a v-if="activity.location_url" :href="activity.location_url" target="_blank" rel="noopener noreferrer">{{ t("View on map \u2197") }}</a></article><article v-if="(invitation.event.venue || invitation.event.address) && !celebration.some((a: any) => a.venue === invitation.event.venue && a.address === invitation.event.address)" class="coast-card"><h3>{{ invitation.event.venue }}</h3><p>{{ invitation.event.address }}</p><a v-if="invitation.event.location_url" :href="invitation.event.location_url" target="_blank" rel="noopener noreferrer">{{ t("View on map \u2197") }}</a></article></div></div>
+    </section>
+    <section v-if="[invitation.event.dress_code,invitation.event.guest_information,invitation.event.parking_information,invitation.event.transportation_information,invitation.event.accommodation_information].some(Boolean)" class="coast-page coast-dress"><ReferenceAsset background name="paper-sea.webp" :src="invitation.media?.paperSea" /><div class="coast-dress-panel" data-reveal><h2>{{ invitation.event.dress_code ? t('Dress Code') : t('Guest information') }}</h2><p class="coast-dress-title">{{ invitation.event.dress_code }}</p><template v-if="demo"><p>Fancy, Colorful &amp; Stylish</p><strong>Kindly Avoid Wearing White or Black</strong></template><p v-if="invitation.event.guest_information">{{ invitation.event.guest_information }}</p><p v-if="invitation.event.parking_information">{{ invitation.event.parking_information }}</p><p v-if="invitation.event.transportation_information">{{ invitation.event.transportation_information }}</p><p v-if="invitation.event.accommodation_information">{{ invitation.event.accommodation_information }}</p></div></section>
+    <section data-section="story" v-if="invitation.content?.story_enabled" class="coast-page"><ReferenceAsset background name="paper-sea.webp" :src="invitation.media?.paperSea" /><div data-reveal><h2>{{ invitation.content.story_heading || t('Our Story') }}</h2><p class="coast-story">{{ invitation.content.story_body }}</p></div></section>
+    <section data-section="gifts" v-if="invitation.content?.gift_registry_enabled" class="coast-page coast-gifts"><ReferenceAsset background name="paper-sea.webp" :src="invitation.media?.paperSea" /><div data-reveal><h2>{{ t("Gift Registry") }}</h2><div class="coast-gift-panel"><p>{{ invitation.content.gift_registry_intro }}</p><ReferenceGifts :methods="invitation.gift_methods || []" /></div></div></section>
+    <section class="coast-page coast-rsvp"><ReferenceAsset background name="paper-coast-border.webp" :src="invitation.media?.paperBorder" /><div data-reveal><h2>RSVP</h2><p v-if="invitation.event.rsvp_deadline" class="coast-deadline">Please reply before: {{ invitation.event.rsvp_deadline }}</p><slot><ReferenceRsvpDemo /></slot><footer data-section="ending" v-if="invitation.content?.ending_enabled !== false"><h2>{{ invitation.content?.ending_title || names }}</h2><p>{{ invitation.content?.ending_message || '♡ Happily Ever After ♡' }}</p><span class="template-footer-brand">FormalEvites</span></footer></div></section>
+</article>
 </template>
-
 <style scoped>
-.romantic-invitation-document { overflow: hidden; border: 1px solid rgba(194, 138, 145, 0.4); border-radius: 2rem; background: #fffaf8; box-shadow: 0 1.5rem 4.4rem rgba(91, 38, 50, 0.16); }
-.romantic-hero { position: relative; overflow: hidden; padding: clamp(4rem, 10vw, 7.5rem) clamp(1.5rem, 7vw, 5.5rem); text-align: center; }
-.hero-botanical { position: absolute; width: clamp(9rem, 20vw, 14rem); height: auto; color: rgba(155, 93, 106, 0.22); pointer-events: none; }
-.hero-botanical--top { top: -1.5rem; left: -1.5rem; }
-.hero-botanical--bottom { right: -1.5rem; bottom: -1.5rem; transform: rotate(180deg); }
-.romantic-eyebrow { position: relative; margin: 0; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.28em; text-transform: uppercase; opacity: 0.68; }
-.romantic-intro-line { position: relative; margin: 2rem 0 0; font-family: Georgia, serif; font-size: clamp(1.05rem, 2vw, 1.3rem); font-style: italic; opacity: 0.75; }
-.romantic-hosts { position: relative; margin: 1rem 0 0; font-family: Georgia, serif; font-size: clamp(2.3rem, 6vw, 4.5rem); font-weight: 400; line-height: 1.08; }
-.romantic-ampersand { font-size: 0.65em; font-style: italic; }
-.romantic-party { position: relative; margin: 2rem 0 0; font-size: 1rem; }
-.romantic-rule { display: block; width: 5rem; height: 1px; margin: 2rem auto; }
-.romantic-event-title { position: relative; margin: 0; font-family: Georgia, serif; font-size: clamp(1.9rem, 4vw, 3rem); font-weight: 400; }
-.romantic-document-body { padding: clamp(2.5rem, 6vw, 5rem); }
-.romantic-date-section { text-align: center; }
-.romantic-date { margin: 0.8rem 0 0; font-family: Georgia, serif; font-size: clamp(2rem, 4vw, 3rem); }
-.romantic-time { margin: 0.5rem 0 0; font-size: 1.08rem; }
-.romantic-timezone { margin: 0.4rem 0 0; font-size: 0.85rem; opacity: 0.6; }
-.romantic-section, .romantic-location, .romantic-details, .romantic-closing { margin-top: clamp(3.5rem, 7vw, 5.5rem); }
-.romantic-section-heading, .romantic-closing { text-align: center; }
-.romantic-section-heading h2, .romantic-location h2, .romantic-detail-card h2 { margin: 0.7rem 0 0; font-family: Georgia, serif; font-size: clamp(1.7rem, 3vw, 2.3rem); font-weight: 400; }
-.romantic-timeline { max-width: 36rem; margin: 2rem auto 0; padding: 0 0 0 1.7rem; border-left: 1px solid rgba(185, 121, 133, 0.4); list-style: none; }
-.romantic-timeline li { position: relative; padding: 0 0 1.8rem; }
-.romantic-timeline li:last-child { padding-bottom: 0; }
-.romantic-timeline-dot { position: absolute; top: 0.45rem; left: -2.06rem; width: 0.72rem; height: 0.72rem; border: 3px solid #fffaf8; border-radius: 50%; box-shadow: 0 0 0 1px rgba(185, 121, 133, 0.35); }
-.romantic-timeline h3 { margin: 0; font-family: Georgia, serif; font-size: 1.35rem; font-weight: 400; }
-.romantic-meta { margin: 0.35rem 0 0; font-size: 0.9rem; opacity: 0.72; }
-.romantic-copy { margin: 0.85rem 0 0; white-space: pre-line; line-height: 1.65; }
-.romantic-location { padding: clamp(1.75rem, 4vw, 3rem); border: 1px solid rgba(194, 138, 145, 0.36); border-radius: 1.35rem; background: linear-gradient(145deg, rgba(255, 252, 248, 0.95), rgba(247, 231, 225, 0.72)); text-align: center; }
-.romantic-location-link { display: inline-flex; gap: 0.5rem; margin-top: 1.3rem; padding: 0.7rem 1.15rem; border: 1px solid currentColor; border-radius: 9999px; color: inherit; font-size: 0.9rem; font-weight: 600; text-decoration: none; }
-.romantic-location-link:focus-visible { outline: 3px solid rgba(146, 54, 73, 0.35); outline-offset: 3px; }
-.romantic-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.romantic-detail-card { padding: 1.5rem; border: 1px solid rgba(194, 138, 145, 0.28); border-radius: 1.1rem; background: rgba(255, 252, 248, 0.84); }
-.romantic-detail-card--wide { grid-column: 1 / -1; }
-.romantic-detail-card h2 { font-size: 1.25rem; }
-.romantic-detail-card p { margin: 0.65rem 0 0; white-space: pre-line; line-height: 1.6; }
-.romantic-closing { padding-top: 1rem; }
-.romantic-closing .romantic-rule { margin-bottom: 1.3rem; }
-.romantic-closing p { margin: 0; font-family: Georgia, serif; font-size: 1.1rem; font-style: italic; }
-.romantic-closing .romantic-closing-names { margin-top: 0.35rem; font-size: 1.5rem; font-style: normal; }
-@media (max-width: 640px) { .romantic-invitation-document { border-radius: 1.35rem; } .romantic-details { grid-template-columns: 1fr; } .romantic-detail-card--wide { grid-column: auto; } .romantic-document-body { padding: 2.5rem 1.5rem; } }
+.coast-document{max-width:820px;margin:auto;background:#f7e9df;color:#654840;font:16px/1.45 Georgia,serif;text-align:center}.coast-document h1,.coast-document h2{font-family:'Invitation Script',cursive}.coast-document h2{font-size:clamp(40px,12vw,89.6px);line-height:.9;color:#a66c21;margin:0 0 32px}.coast-opening{position:relative;isolation:isolate;min-height:100svh;display:grid;grid-template-rows:1fr auto;gap:16px;padding:73.6px 32px 56px}.opening-shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(#4a2b2547,transparent 31%,transparent 68%,#321c167a)}.coast-identity{margin:16px auto 0;max-width:432px;width:100%;color:#fff4eb}.coast-identity h1{font-size:clamp(51.2px,13vw,92.8px);line-height:.82}.coast-identity h1 span{display:block;font-size:.82em;margin:.08em 0}.coast-identity p{margin-top:8.8px;font:600 clamp(9.92px,2.4vw,12.48px)/1.45 'Invitation Sans',Arial,sans-serif;letter-spacing:.2em}.coast-open{justify-self:center;border:1px solid #ffffffc7;border-radius:999px;background:#5e2d2538;color:#fff;padding:11.2px 17.6px;font:700 10.4px/1.45 'Invitation Sans',Arial,sans-serif;letter-spacing:1.456px;text-transform:uppercase;display:flex;gap:8.8px;align-items:center}.coast-page{position:relative;isolation:isolate;min-height:100svh;padding:9vh min(5.5vw,72px);overflow:hidden}.coast-page>.reference-asset{inset:-40px}.coast-page>.reference-asset:deep(.reference-asset__label){bottom:48px;left:48px;right:48px}.coast-page>.reference-asset--missing{background:#f1e7df}.coast-details{display:grid;place-items:center}.coast-details-panel{padding:32px 21.6px;display:grid;gap:22.4px;width:100%;max-width:496px}.coast-monogram{width:88px;height:88px;margin:auto;background:transparent}.coast-monogram:deep(.reference-asset__label){inset:0;display:grid;place-items:center;font-size:8px;border:1px dashed #aa9585;background:transparent}.coast-quote{font-size:clamp(16px,3.8vw,20.48px);font-style:italic;line-height:1.65}.coast-families{display:grid;grid-template-columns:1fr 1fr;gap:22.4px;font-size:15.2px}.coast-families span{display:block;font-family:'Invitation Script',cursive;font-size:32px}.coast-request{font:500 16px/1.8 'Invitation Sans',Arial,sans-serif;letter-spacing:1.92px;max-width:416px;margin:auto}.coast-countdown h2{font-size:clamp(40.8px,10vw,73.6px);max-width:none;margin:0}.coast-counter{display:grid;grid-template-columns:repeat(4,1fr);gap:8.8px;max-width:496px;margin:20.8px auto}.coast-counter>div{padding:13.6px 3.2px 10.4px;background:rgba(255,250,246,.88);border:1px solid #b2705238;border-radius:6.4px;box-shadow:0 5px 16px #74392b14}.coast-counter strong{font-family:Georgia,serif;font-size:clamp(22.4px,6vw,36px);font-weight:400;line-height:1;color:#ad7468;display:block}.coast-counter span{font:clamp(6.72px,1.6vw,9.28px)/1.45 'Invitation Sans',Arial,sans-serif;letter-spacing:.05em;text-transform:uppercase;display:block;margin-top:7.68px}.coast-countdown .coast-countdown-note{font-style:italic;font-size:14.08px;margin:16px 0}.coast-calendar{max-width:464px;margin:16px auto 40px;border:1px solid #b2705238;background:rgba(255,251,247,.87);padding:20px 17.6px 22.4px;border-radius:8.8px;box-shadow:0 12px 32px #5e302b1a}.coast-calendar>p{margin-bottom:17.6px;font-weight:500}.coast-calendar>div{display:grid;grid-template-columns:repeat(7,1fr);gap:5.12px 1.6px}.coast-calendar b,.coast-calendar span{position:relative;display:grid;place-items:center;min-height:26.4px;font-size:11.52px;font-weight:400}.coast-calendar b{font-family:'Invitation Sans',Arial,sans-serif;font-size:8.32px;min-height:0;display:block;text-transform:uppercase}.coast-calendar .chosen{font-weight:700}.coast-calendar i{position:absolute;font:400 40.8px/1 Georgia,serif;color:#ad7468;top:50%;left:50%;transform:translate(-50%,-49%)}.coast-meeting-grid,.coast-celebration-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:528px;margin:28.8px auto 48px}.coast-card{padding:25.6px 19.2px;background:rgba(255,250,246,.86);border:1px solid #b4694d47;border-radius:13.6px;box-shadow:0 12px 32px #5b2e2b1c}.coast-small-icon{height:51.2px;width:51.2px;margin:0 auto 13.6px;background:#fde8e4;border-radius:50%;padding:11.84px}.coast-small-icon:deep(.reference-asset__label){font-size:4px;inset:11.84px;padding:1px;background:transparent;display:grid;place-items:center}.coast-side{font:9.28px/1.6 'Invitation Sans',Arial,sans-serif;text-transform:uppercase;letter-spacing:1.6704px;margin:4px 0!important}.coast-card h3{font-size:20px;line-height:1.45;font-weight:500;margin:4.8px 0}.coast-card a{display:inline-block;margin-top:12px;font:10px 'Invitation Sans',Arial,sans-serif;text-decoration:underline}.coast-celebration h2{font-size:clamp(44.8px,11vw,80px)}.coast-celebration-grid{max-width:544px;margin:32px auto 80px}.coast-celebration .coast-card{padding:20px;display:grid;grid-template-columns:54.4px minmax(0,1fr);gap:16px;text-align:start;align-items:start}.coast-celebration .coast-small-icon{margin:0;padding:11.2px}.coast-celebration .coast-card>p,.coast-celebration .coast-card>a{grid-column:2}.coast-celebration h3{font-size:21.6px;margin:5.6px 0 4px}.coast-dress{display:grid;place-items:center}.coast-dress-panel{width:100%;max-width:496px;padding:clamp(32px,7vw,54.4px) clamp(22.4px,6vw,44.8px);border:1px solid #b88a5447;border-radius:16px;background:rgba(255,250,246,.84);box-shadow:0 16px 42px #6548401f}.coast-dress h2{margin-bottom:20px}.coast-dress-panel p{margin-top:16px;line-height:1.65}.coast-dress-panel .coast-dress-title{margin-top:0;font-size:clamp(20px,5vw,29.6px);color:#785149;line-height:1.35}.coast-dress-panel strong{display:inline-block;margin-top:20px;padding:10.4px 16px;background:#f5e4de;border-radius:999px;font:600 10.24px/1.45 'Invitation Sans',Arial,sans-serif;letter-spacing:.7168px}.coast-gift-panel{max-width:512px;margin:28.8px auto 64px;padding:28.8px 20.8px;background:rgba(255,250,246,.86);border:1px solid #b4694d47;border-radius:13.6px;box-shadow:0 12px 32px #5b2e2b1c}.coast-gift-panel>p{margin:4px 0 19.2px}.coast-story{white-space:pre-line;line-height:1.8;max-width:560px;margin:auto!important}.coast-rsvp{min-height:calc(100svh + 78px)}.coast-rsvp>div{max-width:560px;margin:auto}.coast-rsvp h2{font-size:102.4px;line-height:1;margin:0}.coast-rsvp .coast-deadline{font-size:12.16px;margin:5.6px 0 14.4px}.coast-rsvp footer{padding-top:64px;min-height:30vh;margin-top:17.6px;display:flex;flex-direction:column;align-items:center}.coast-rsvp footer h2{font-size:clamp(41.6px,11vw,75.2px);margin:4.8px 0}.coast-rsvp footer>p{margin:6.4px 0}.coast-footer-logo{width:136px;height:54.72px;flex-shrink:0;margin:auto auto 0;border-radius:8px;background:linear-gradient(135deg,#bc8d82,#a9756c)}.coast-rsvp :deep(.reference-demo-form){min-height:366px}
+@media(min-width:680px){.coast-side{font-size:11.52px;letter-spacing:2.0736px}}
+@media(max-width:679px){.coast-meeting-grid,.coast-celebration-grid{grid-template-columns:1fr}}
+@container(max-width:600px){.coast-rsvp h2{font-size:54.4px}}
+@media(max-width:820px){.coast-rsvp>div>h2{font-size:clamp(54.4px,14vw,102.4px)}}
+.coast-opening,.coast-page{scroll-snap-align:start}.coast-meeting h2,.coast-gifts h2{margin-bottom:0}.coast-small-icon:deep(img),.coast-monogram:deep(img){object-fit:contain}
+:global(html:has(#app > main > .coast-document)),:global(body:has(#app > main > .coast-document)){scroll-snap-type:y mandatory;scroll-behavior:smooth}
+@media(prefers-reduced-motion:reduce){:global(html:has(#app > main > .coast-document)),:global(body:has(#app > main > .coast-document)){scroll-behavior:auto}}
+.coast-footer-logo:not(.reference-asset--missing){padding:8.8px 18px}.coast-footer-logo:deep(img){object-fit:contain}
+
+.native-family-greeting{font:22px/1.5 Georgia,serif;margin:20px auto;overflow-wrap:anywhere}
 </style>

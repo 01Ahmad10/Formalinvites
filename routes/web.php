@@ -13,6 +13,8 @@ use App\Http\Controllers\EventInvitationController;
 use App\Http\Controllers\AdminTemplateController;
 use App\Http\Controllers\EventPublicationController;
 use App\Http\Controllers\EventSetupController;
+use App\Http\Controllers\EventBuilderController;
+use App\Http\Controllers\TemplateDemoController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -26,6 +28,10 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', DashboardController::class)->middleware('auth')->name('dashboard');
+// Local visual reconstruction specimens; no customer data or RSVP endpoint.
+Route::get('/template-demos/assets/{template}/{role}', [TemplateDemoController::class, 'asset'])
+    ->where('template', '[1-7]')->where('role', '[A-Za-z][A-Za-z0-9]*')->name('template-demos.assets');
+Route::get('/template-demos/{template?}', TemplateDemoController::class)->name('template-demos');
 Route::get('rsvp/{token}', [PublicRsvpController::class, 'show'])->middleware('throttle:60,1')->name('public.rsvp.show');
 Route::post('rsvp/{token}', [PublicRsvpController::class, 'submit'])->middleware('throttle:10,1')->name('public.rsvp.submit');
 Route::get('invite/{token}', [PublicInvitationController::class, 'show'])->middleware('throttle:60,1')->name('public.invitation.show');
@@ -45,6 +51,8 @@ Route::middleware('auth')->group(function () {
     Route::get('events/{event}/invitation/live-preview', [EventPublicationController::class, 'livePreview'])->name('events.invitation.live-preview');
     Route::get('events/{event}/setup', [EventSetupController::class, 'show'])->name('events.setup');
     Route::patch('events/{event}/setup/{step}', [EventSetupController::class, 'save'])->name('events.setup.save');
+    Route::get('events/{event}/builder', [EventBuilderController::class, 'show'])->name('events.builder');
+    Route::put('events/{event}/builder', [EventBuilderController::class, 'update'])->name('events.builder.update');
     Route::post('events/{event}/publication/publish', [EventPublicationController::class, 'publish'])->name('events.publication.publish');
     Route::patch('events/{event}/publication/archive', [EventPublicationController::class, 'archive'])->name('events.publication.archive');
     Route::get('events/{event}/guests', [GuestManagementController::class, 'index'])->name('events.guests.index');

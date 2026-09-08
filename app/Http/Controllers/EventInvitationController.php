@@ -80,10 +80,17 @@ class EventInvitationController extends Controller
             ? $event->invitationParties()->findOrFail($request->integer('party_id'))
             : null;
 
-        return Inertia::render('Events/InvitationPreview', ['invitation' => $presenter->present($event, $party)]);
+        $invitation = $presenter->present($event, $party);
+        $invitation['preview_context'] = [
+            'party' => $party ? \App\Support\InvitationPreviewContext::party($party) : null,
+            'meals' => $event->mealOptions()->where('is_active', true)->orderBy('display_order')->get(['id', 'name']),
+            'closed' => $event->isRsvpClosed(),
+        ];
+
+        return Inertia::render('Events/InvitationPreview', ['invitation' => $invitation]);
     }
 
     private function view(Request $request, Event $event): void { abort_unless($request->user()->can('view', $event), 403); }
     private function manage(Request $request, Event $event): void { abort_unless($request->user()->can('update', $event), 403); }
-    private function templateForSelection(Template $template): array { return ['id' => $template->id, 'name' => $template->name, 'description' => $template->description, 'component_key' => $template->component_key, 'is_active' => $template->is_active, ...InvitationTemplateSettings::selectionOptions($template->default_settings)]; }
+    private function templateForSelection(Template $template): array { return ['id' => $template->id, 'name' => $template->name, 'description' => $template->description, 'component_key' => $template->component_key, 'demo_url' => $template->demo_url, 'is_active' => $template->is_active, ...InvitationTemplateSettings::selectionOptions($template->default_settings)]; }
 }

@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(WebgencyTemplateSeeder::class);
         $password = Hash::make('password');
         $admin = User::firstOrCreate(['email' => 'admin@formalevites.test'], ['name' => 'Admin User', 'role' => 'admin', 'password' => $password]);
         $first = Customer::firstOrCreate(['name' => 'Cedar Celebrations'], ['contact_name' => 'Maya Haddad', 'email' => 'maya@example.test', 'is_active' => true]);

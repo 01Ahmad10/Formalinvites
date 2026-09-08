@@ -30,7 +30,7 @@ class EventController extends Controller
 
         $relations = ['package', 'activities' => fn ($query) => $query->orderBy('display_order')->orderBy('starts_at'), 'payments' => fn ($query) => $query->with(['transactions' => fn ($transactions) => $transactions->orderBy('payment_date')->orderBy('id')])->latest()];
         if ($user->isAdmin()) $relations[] = 'members:id,name';
-        $event->load($relations);
+        $event->load([...$relations, 'template:id,name,component_key']);
         $payment = $event->payments->first();
         $activities = $event->activities
             ->map(fn ($activity) => $this->activityForPresentation($activity, $event))
@@ -44,7 +44,7 @@ class EventController extends Controller
         $hasUnpublishedChanges = $hasLiveVersion && ! hash_equals($livePublication->snapshot_hash, $currentHash);
         $invitationStatus = $isArchived ? 'archived' : (! $hasLiveVersion ? 'setup' : ($hasUnpublishedChanges ? 'live_unpublished_changes' : 'live'));
         $eventForPresentation = $user->isAdmin() ? $event : [
-            'id' => $event->id, 'title' => $event->title, 'event_type' => $event->event_type, 'host_name' => $event->host_name,
+            'id' => $event->id, 'title' => $event->title, 'template' => $event->template ? ['name' => $event->template->name] : null, 'event_type' => $event->event_type, 'host_name' => $event->host_name,
             'second_host_name' => $event->second_host_name, 'description' => $event->description, 'main_date' => $event->main_date,
             'end_date' => $event->end_date, 'start_time' => $event->start_time, 'end_time' => $event->end_time,
             'rsvp_deadline' => $event->rsvp_deadline, 'event_timezone' => $event->event_timezone, 'venue' => $event->venue,

@@ -18,7 +18,7 @@ class DashboardController extends Controller
             return $this->customerDashboard($user);
         }
 
-        $relations = ['customer', 'package', 'payments', 'publications'];
+        $relations = ['customer', 'package', 'payments', 'publications', 'template:id,name,component_key'];
         $events = Event::with($relations)->latest()->get();
         $events->each(function (Event $event) use ($snapshots): void {
             $live = $event->publications->sortByDesc('version')->first();
@@ -34,8 +34,8 @@ class DashboardController extends Controller
     private function customerDashboard($user): Response
     {
         $events = $user->managedEvents()
-            ->select(['events.id', 'events.customer_id', 'events.event_package_id', 'events.title', 'events.main_date', 'events.status', 'events.guest_capacity'])
-            ->with('package:id,maximum_guests')
+            ->select(['events.id', 'events.customer_id', 'events.event_package_id', 'events.template_id', 'events.title', 'events.main_date', 'events.status', 'events.guest_capacity'])
+            ->with(['package:id,maximum_guests', 'template:id,name,component_key'])
             ->withExists('publications')
             ->withCount([
                 'invitationParties as active_party_count' => fn ($query) => $query->where('is_active', true),
@@ -63,6 +63,7 @@ class DashboardController extends Controller
             return [
                 'id' => $event->id,
                 'title' => $event->title ?: 'Your invitation',
+                'template_name' => $event->template?->name,
                 'status' => $status,
                 'date' => $event->main_date?->format('F j, Y'),
                 'guest_capacity' => $event->effectiveGuestCapacity(),
@@ -71,8 +72,8 @@ class DashboardController extends Controller
                 'responded_families' => $responded,
                 'confirmed_attendees' => (int) ($attendees[$event->id] ?? 0),
                 'response_rate' => $families ? (int) round($responded / $families * 100) : 0,
-                'invitation_url' => route('events.setup', $event),
-                'manage_url' => route('events.show', $event),
+                'invitation_url' => $status === 'live' ? route('events.builder', $event) : route('events.setup', $event),
+                'manage_url' => $status === 'archived' ? route('events.show', $event) : ($status === 'live' ? route('events.builder', $event) : route('events.setup', $event)),
                 'preview_url' => route('events.invitation.preview', $event),
                 'view_url' => $status === 'live' ? route('events.invitation.live-preview', $event) : null,
                 'guests_url' => route('events.guests.index', $event),
@@ -87,7 +88,7 @@ class DashboardController extends Controller
                         ? ['title' => 'Add your first family', 'description' => 'Start inviting guests when you are ready.', 'label' => 'Manage Families & Guests', 'url' => route('events.guests.index', $event)]
                         : ($responded === 0
                             ? ['title' => 'Track guest responses', 'description' => 'Responses will appear here after your guests reply.', 'label' => 'View RSVP Responses', 'url' => route('events.rsvps.index', $event)]
-                            : ['title' => 'Keep your invitation up to date', 'description' => 'Review your invitation and guest responses as plans come together.', 'label' => 'Edit Invitation', 'url' => route('events.setup', $event)]))),
+                            : ['title' => 'Keep your invitation up to date', 'description' => 'Review your invitation and guest responses as plans come together.', 'label' => 'Edit Invitation', 'url' => route('events.builder', $event)]))),
             ];
         })->values();
 

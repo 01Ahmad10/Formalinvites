@@ -25,7 +25,7 @@ const navigation = computed<Item[]>(() => {
         const events = page.props.auth.customerEvents || [];
         if (events.length === 1) {
             const event = events[0];
-            items.push({ label: 'My Invitation', href: event.is_live || event.is_archived ? route('events.show', event.id) : route('events.setup', event.id), paths: [`/events/${event.id}`, `/events/${event.id}/setup`], icon: 'events', exact: true });
+            items.push({ label: 'My Invitation', href: event.is_archived ? route('events.show', event.id) : (event.is_live ? route('events.builder', event.id) : route('events.setup', event.id)), paths: [`/events/${event.id}`, `/events/${event.id}/setup`, `/events/${event.id}/builder`], icon: 'events', exact: true });
             if (!event.is_archived) items.push(
                 { label: 'Families & Guests', href: route('events.guests.index', event.id), paths: [`/events/${event.id}/guests`], icon: 'families' },
                 { label: 'RSVP Responses', href: route('events.rsvps.index', event.id), paths: [`/events/${event.id}/rsvps`], icon: 'rsvp' },

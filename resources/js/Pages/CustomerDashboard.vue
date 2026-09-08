@@ -10,6 +10,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3';
 type Invitation = {
     id: number;
     title: string;
+    template_name: string | null;
     status: 'setup' | 'live' | 'archived';
     date: string | null;
     guest_capacity: number | null;
@@ -26,7 +27,8 @@ type Invitation = {
     rsvps_url: string;
     meals_url: string;
     schedule_url: string;
-    next_action: { title: string; description: string; label: string; url: string };
+    next_action: { title: string;
+    template_name: string | null; description: string; label: string; url: string };
 };
 
 const props = defineProps<{ invitations: Invitation[] }>();
@@ -52,7 +54,7 @@ const greeting = () => user.name.split(' ')[0] || 'there';
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-3"><p class="fe-page-eyebrow">Your invitation</p><Badge :tone="statusTone(singleInvitation.status)">{{ invitationStatus(singleInvitation.status) }}</Badge></div>
                             <h2 class="fe-display-heading mt-2 text-3xl sm:text-4xl">{{ singleInvitation.title }}</h2>
-                            <p class="mt-3 text-sm text-[color:var(--fe-text-secondary)]">{{ singleInvitation.date || 'Date to be confirmed' }}</p>
+                            <p class="mt-3 text-sm text-[color:var(--fe-text-secondary)]">Template: {{ singleInvitation.template_name || 'Not selected' }} · {{ singleInvitation.date || 'Date to be confirmed' }}</p>
                         </div>
                         <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row lg:shrink-0"><Link :href="singleInvitation.status === 'archived' ? singleInvitation.manage_url : singleInvitation.invitation_url" class="fe-btn fe-btn-primary justify-center">{{ singleInvitation.status === 'setup' ? 'Continue Setup' : singleInvitation.status === 'archived' ? 'View Invitation' : 'Edit Invitation' }}</Link><Link v-if="singleInvitation.status !== 'archived'" :href="singleInvitation.view_url || singleInvitation.preview_url" class="fe-btn fe-btn-secondary justify-center">{{ singleInvitation.view_url ? 'View Invitation' : 'Preview Invitation' }}</Link></div>
                     </div>
@@ -84,7 +86,7 @@ const greeting = () => user.name.split(' ')[0] || 'there';
             <section v-else>
                 <p class="fe-section-copy">You have more than one invitation. Choose one to manage its details, guests, and responses.</p>
                 <div class="mt-5 grid gap-4 lg:grid-cols-2">
-                    <Card v-for="invitation in invitations" :key="invitation.id"><div class="flex flex-wrap items-start justify-between gap-3"><div><div class="flex items-center gap-2"><p class="fe-section-title">{{ invitation.title }}</p><Badge :tone="statusTone(invitation.status)">{{ invitationStatus(invitation.status) }}</Badge></div><p class="mt-2 text-sm text-[color:var(--fe-text-secondary)]">{{ invitation.date || 'Date to be confirmed' }}</p></div><Link :href="invitation.manage_url" class="fe-btn fe-btn-secondary">Open Invitation</Link></div><dl class="mt-5 grid grid-cols-2 gap-3 text-sm"><div><dt class="text-[color:var(--fe-text-muted)]">Guest Capacity</dt><dd class="mt-1 font-semibold">{{ invitation.guest_capacity ?? '—' }}</dd></div><div><dt class="text-[color:var(--fe-text-muted)]">RSVP Progress</dt><dd class="mt-1 font-semibold">{{ invitation.response_rate }}%</dd></div></dl></Card>
+                    <Card v-for="invitation in invitations" :key="invitation.id"><div class="flex flex-wrap items-start justify-between gap-3"><div><div class="flex items-center gap-2"><p class="fe-section-title">{{ invitation.title }}</p><Badge :tone="statusTone(invitation.status)">{{ invitationStatus(invitation.status) }}</Badge></div><p class="mt-2 text-sm text-[color:var(--fe-text-secondary)]">Template: {{ invitation.template_name || 'Not selected' }} · {{ invitation.date || 'Date to be confirmed' }}</p></div><Link :href="invitation.manage_url" class="fe-btn fe-btn-secondary">Open Invitation</Link></div><dl class="mt-5 grid grid-cols-2 gap-3 text-sm"><div><dt class="text-[color:var(--fe-text-muted)]">Guest Capacity</dt><dd class="mt-1 font-semibold">{{ invitation.guest_capacity ?? '—' }}</dd></div><div><dt class="text-[color:var(--fe-text-muted)]">RSVP Progress</dt><dd class="mt-1 font-semibold">{{ invitation.response_rate }}%</dd></div></dl></Card>
                 </div>
             </section>
         </main>

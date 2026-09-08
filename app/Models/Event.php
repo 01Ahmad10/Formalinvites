@@ -20,11 +20,13 @@ class Event extends Model
     public function package(): BelongsTo { return $this->belongsTo(EventPackage::class, 'event_package_id'); }
     public function template(): BelongsTo { return $this->belongsTo(Template::class); }
     public function templateSetting(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(EventTemplateSetting::class); }
+    public function invitationContent(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(EventInvitationContent::class); }
     public function members(): BelongsToMany { return $this->belongsToMany(User::class)->withPivot('role')->withTimestamps(); }
     public function payments(): HasMany { return $this->hasMany(Payment::class); }
     public function invitationParties(): HasMany { return $this->hasMany(InvitationParty::class); }
     public function mealOptions(): HasMany { return $this->hasMany(EventMealOption::class); }
     public function activities(): HasMany { return $this->hasMany(EventActivity::class); }
+    public function giftMethods(): HasMany { return $this->hasMany(EventGiftMethod::class); }
     public function publications(): HasMany { return $this->hasMany(EventPublication::class); }
     public function latestPublication(): ?EventPublication { return $this->publications()->orderByDesc('version')->first(); }
 

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\Event;
 use App\Models\EventPackage;
+use App\Models\InvitationEntitlement;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -15,33 +16,31 @@ class ClientOnboardingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_creates_client_primary_login_package_and_empty_setup_shell_together(): void
+    public function test_admin_creates_client_primary_login_and_available_entitlement_without_an_event(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $package = EventPackage::create(['name' => '201–250 Guests', 'minimum_guests' => 201, 'maximum_guests' => 250, 'price' => 130, 'is_active' => true]);
 
         $this->actingAs($admin)->post(route('admin.clients.store'), [
-            'name' => 'Acme Family', 'phone' => '555', 'guest_capacity' => 220, 'allowed_events' => 1,
+            'name' => 'Acme Family', 'phone' => '555', 'entitlements' => [['event_package_id' => $package->id, 'exact_guest_capacity' => 220]],
             'primary_name' => 'Maya Client', 'primary_email' => 'maya@example.test', 'primary_password' => 'safe-password',
         ])->assertRedirect();
 
         $customer = Customer::where('name', 'Acme Family')->firstOrFail();
         $user = User::where('email', 'maya@example.test')->firstOrFail();
-        $event = Event::where('customer_id', $customer->id)->firstOrFail();
+        $entitlement = InvitationEntitlement::where('customer_id', $customer->id)->sole();
         $this->assertSame('primary', $user->customer_account_role);
         $this->assertTrue(Hash::check('safe-password', $user->password));
         $this->assertSame('Maya Client', $customer->contact_name);
         $this->assertSame('maya@example.test', $customer->email);
-        $this->assertNull($event->title);
-        $this->assertSame($package->id, $event->event_package_id);
-        $this->assertSame(220, $event->guest_capacity);
-        $this->assertSame(220, $event->effectiveGuestCapacity());
-        $this->assertSame('130.00', $event->package->price);
-        $this->assertDatabaseHas('event_user', ['event_id' => $event->id, 'user_id' => $user->id, 'role' => 'owner']);
+        $this->assertDatabaseCount('events', 0);
+        $this->assertSame($package->id, $entitlement->event_package_id);
+        $this->assertSame(220, $entitlement->exact_guest_capacity);
+        $this->assertTrue($entitlement->isAvailable());
         $this->actingAs($admin)->get(route('admin.customers.show', $customer))->assertInertia(fn (Assert $page) => $page
-            ->where('events.0.guest_capacity', 220)
-            ->where('events.0.package.name', '201–250 Guests')
-            ->where('events.0.finance.has_record', false));
+            ->where('events', [])
+            ->where('allowance.allowed_events', 1)
+            ->where('allowance.remaining_events', 1));
     }
 
     public function test_client_cannot_have_more_than_two_customer_login_accounts(): void
@@ -56,7 +55,7 @@ class ClientOnboardingTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'third@example.test']);
     }
 
-    public function test_clients_list_exposes_safe_single_event_summary_and_does_not_choose_from_multiple_events(): void
+    public function test_clients_list_uses_multi_invitation_safe_summary_columns(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $package = EventPackage::create(['name' => '50 guests', 'minimum_guests' => 1, 'maximum_guests' => 50, 'price' => 100, 'is_active' => true]);
@@ -71,26 +70,26 @@ class ClientOnboardingTest extends TestCase
 
         $this->actingAs($admin)->get(route('admin.customers.index'))->assertInertia(fn (Assert $page) => $page->component('Admin/Customers')
             ->where('customers.0.event_count', 2)
-            ->where('customers.0.event', null)
             ->where('customers.1.primary_login.email', 'primary@example.test')
             ->where('customers.1.second_login.email', 'second@example.test')
-            ->where('customers.1.event.title', 'Only Event'));
+            ->where('customers.1.event_count', 1));
     }
 
     public function test_guest_capacity_requires_exactly_one_active_package_match(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         EventPackage::create(['name'=>'1–50','minimum_guests'=>1,'maximum_guests'=>50,'price'=>100,'is_active'=>true]);
-        $payload = ['name'=>'Client','guest_capacity'=>51,'allowed_events'=>1,'primary_name'=>'Primary','primary_email'=>'primary@example.test','primary_password'=>'safe-password'];
-        $this->actingAs($admin)->post(route('admin.clients.store'), $payload)->assertSessionHasErrors('guest_capacity');
+        $payload = ['name'=>'Client','entitlements'=>[['event_package_id'=>9999,'exact_guest_capacity'=>51]],'primary_name'=>'Primary','primary_email'=>'primary@example.test','primary_password'=>'safe-password'];
+        $this->actingAs($admin)->post(route('admin.clients.store'), $payload)->assertSessionHasErrors('entitlements.0.event_package_id');
         EventPackage::create(['name'=>'40–60','minimum_guests'=>40,'maximum_guests'=>60,'price'=>120,'is_active'=>true]);
-        $payload['guest_capacity'] = 45;
-        $this->actingAs($admin)->post(route('admin.clients.store'), $payload)->assertSessionHasErrors('guest_capacity');
+        $first = EventPackage::firstOrFail();
+        $payload['entitlements'] = [['event_package_id' => $first->id, 'exact_guest_capacity' => 51]];
+        $this->actingAs($admin)->post(route('admin.clients.store'), $payload)->assertSessionHasErrors('entitlements.0.exact_guest_capacity');
     }
 
     public function test_non_admins_cannot_create_clients(): void
     {
-        $payload = ['name'=>'Client','guest_capacity'=>20,'allowed_events'=>1,'primary_name'=>'Primary','primary_email'=>'primary@example.test','primary_password'=>'safe-password'];
+        $payload = ['name'=>'Client','entitlements'=>[['event_package_id'=>1,'exact_guest_capacity'=>20]],'primary_name'=>'Primary','primary_email'=>'primary@example.test','primary_password'=>'safe-password'];
         $this->actingAs(User::factory()->create(['role'=>'customer']))->post(route('admin.clients.store'), $payload)->assertForbidden();
     }
 

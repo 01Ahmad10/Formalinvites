@@ -7,6 +7,7 @@ export const invitationStatus = (status?: string | null) => {
 };
 
 export const paymentStatus = (status?: string | null) => ({
+    no_record: 'No financial record',
     paid: 'Paid',
     partially_paid: 'Partially Paid',
     unpaid: 'Unpaid',
@@ -14,7 +15,7 @@ export const paymentStatus = (status?: string | null) => ({
 
 export const statusTone = (status?: string | null) => status === 'paid' || status === 'live' || status === 'active'
     ? 'success'
-    : status === 'archived' || status === 'inactive' || status === 'disabled'
+    : status === 'archived' || status === 'inactive' || status === 'disabled' || status === 'no_record'
         ? 'neutral'
         : 'warning';
 

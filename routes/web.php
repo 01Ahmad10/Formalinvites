@@ -15,15 +15,12 @@ use App\Http\Controllers\EventPublicationController;
 use App\Http\Controllers\EventSetupController;
 use App\Http\Controllers\EventBuilderController;
 use App\Http\Controllers\TemplateDemoController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
     ]);
 });
 
@@ -37,6 +34,7 @@ Route::post('rsvp/{token}', [PublicRsvpController::class, 'submit'])->middleware
 Route::get('invite/{token}', [PublicInvitationController::class, 'show'])->middleware('throttle:60,1')->name('public.invitation.show');
 
 Route::middleware('auth')->group(function () {
+    Route::get('events/start', [EventController::class, 'start'])->name('events.start');
     Route::resource('events', EventController::class)->except('destroy');
     Route::get('events/{event}/activities', [EventActivityController::class, 'index'])->name('events.activities.index');
     Route::get('events/{event}/activities/create', [EventActivityController::class, 'create'])->name('events.activities.create');
@@ -81,6 +79,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('customers/{customer}', [AdminController::class, 'showCustomer'])->name('customers.show');
     Route::put('customers/{customer}', [AdminController::class, 'updateCustomer'])->name('customers.update');
     Route::post('customers/{customer}/second-login', [AdminController::class, 'storeSecondLogin'])->name('customers.second-login.store');
+    Route::post('customers/{customer}/invitations', [AdminController::class, 'startInvitation'])->name('customers.invitations.start');
+    Route::post('customers/{customer}/invitation-entitlements', [AdminController::class, 'storeInvitationEntitlement'])->name('customers.invitation-entitlements.store');
+    Route::patch('customers/{customer}/invitation-entitlements/{entitlement}', [AdminController::class, 'updateInvitationEntitlement'])->name('customers.invitation-entitlements.update');
     Route::put('customer-users/{user}/password', [AdminController::class, 'resetCustomerUserPassword'])->name('customer-users.password.update');
     Route::get('packages', [AdminController::class, 'packages'])->name('packages.index');
     Route::post('packages', [AdminController::class, 'storePackage'])->name('packages.store');

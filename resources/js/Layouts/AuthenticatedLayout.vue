@@ -23,8 +23,8 @@ const navigation = computed<Item[]>(() => {
     );
     else {
         const events = page.props.auth.customerEvents || [];
-        if (events.length === 1) {
-            const event = events[0];
+        const event = currentInvitationScope.value;
+        if (event) {
             items.push({ label: 'My Invitation', href: event.is_archived ? route('events.show', event.id) : (event.is_live ? route('events.builder', event.id) : route('events.setup', event.id)), paths: [`/events/${event.id}`, `/events/${event.id}/setup`, `/events/${event.id}/builder`], icon: 'events', exact: true });
             if (!event.is_archived) items.push(
                 { label: 'Families & Guests', href: route('events.guests.index', event.id), paths: [`/events/${event.id}/guests`], icon: 'families' },
@@ -39,6 +39,26 @@ const navigation = computed<Item[]>(() => {
 const currentPath = computed(() => new URL(page.url, 'http://inertia.local').pathname.replace(/\/$/, '') || '/');
 const active = (item: Item) => item.paths.some((path) => item.exact ? currentPath.value === path : currentPath.value === path || currentPath.value.startsWith(`${path}/`));
 const accountLabel = computed(() => page.props.auth.user.role === 'admin' ? 'Administrator' : 'Account');
+const customerEvents = computed(() => page.props.auth.customerEvents || []);
+const currentEventId = computed(() => {
+    const match = currentPath.value.match(/^\/events\/(\d+)(?:\/|$)/);
+    return match ? Number(match[1]) : null;
+});
+const currentInvitationScope = computed(() => {
+    const events = customerEvents.value;
+    if (events.length === 1) return events[0];
+    if (!currentEventId.value) return null;
+    return events.find((event: { id: number | string }) => Number(event.id) === currentEventId.value) || null;
+});
+const currentInvitation = computed(() => {
+    const events = customerEvents.value;
+    const directId = currentEventId.value;
+    if (events.length === 1) return events[0];
+    if (!directId) return null;
+    return events.find((event: { id: number | string }) => Number(event.id) === directId) || null;
+});
+const multipleInvitations = computed(() => page.props.auth.user.role === 'customer' && customerEvents.value.length > 1);
+const currentInvitationTitle = computed(() => currentInvitation.value?.title || 'Select Invitation');
 const openMobileMenu = () => { mobileOpen.value = true; };
 const closeMobileMenu = () => { mobileOpen.value = false; };
 const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') mobileOpen.value = false; };
@@ -52,6 +72,13 @@ onUnmounted(() => { document.removeEventListener('keydown', closeOnEscape); docu
         <ToastNotifications />
         <aside class="fe-sidebar" aria-label="Primary navigation">
             <div class="fe-sidebar-brand"><Link :href="route('dashboard')" aria-label="FormalInvites dashboard"><img :src="formalInvitesLogo" alt="FormalInvites — Sara Shayma" class="fe-brand-logo" /></Link></div>
+            <template v-if="multipleInvitations && currentInvitation">
+                <div class="mx-2 mb-4 rounded border border-[color:var(--fe-border)] bg-[color:var(--fe-surface-elevated)] p-3">
+                    <p class="text-xs font-semibold tracking-[0.12em] text-[color:var(--fe-text-muted)]">Current Invitation</p>
+                    <p class="mt-1 truncate text-sm font-medium">{{ currentInvitationTitle }}</p>
+                    <Link :href="route('events.index')" class="mt-2 inline-flex text-xs font-semibold text-[color:var(--fe-primary)] underline">Switch Invitation</Link>
+                </div>
+            </template>
             <nav class="fe-sidebar-nav"><Link v-for="item in navigation" :key="item.label" :href="item.href" class="fe-sidebar-link" :class="{ 'fe-sidebar-link-active': active(item) }"><span class="fe-sidebar-icon" aria-hidden="true"><SidebarIcon :name="item.icon" /></span>{{ item.label }}</Link></nav>
             <div class="mt-auto border-t border-[color:var(--fe-border)] pt-4"><Dropdown align="left" placement="top" width="48" content-classes="py-1 bg-white border border-[color:var(--fe-border)]"><template #trigger><button type="button" class="fe-sidebar-account"><span class="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--fe-primary)] text-sm font-semibold text-white">{{ $page.props.auth.user.name.slice(0,1).toUpperCase() }}</span><span class="min-w-0 text-left"><span class="block truncate text-sm font-semibold">{{ $page.props.auth.user.name }}</span><span class="block text-xs text-[color:var(--fe-text-muted)]">{{ accountLabel }}</span></span></button></template><template #content><DropdownLink :href="route('profile.edit')">Profile</DropdownLink><DropdownLink :href="route('logout')" method="post" as="button">Log out</DropdownLink></template></Dropdown></div>
         </aside>

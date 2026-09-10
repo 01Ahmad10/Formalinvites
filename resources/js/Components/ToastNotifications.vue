@@ -28,4 +28,4 @@ router.on('error', (event) => {
 });
 </script>
 
-<template><div class="fixed right-4 top-4 z-50 w-[calc(100%-2rem)] max-w-sm space-y-2" aria-live="polite"><div v-for="toast in toasts" :key="toast.id" class="fe-toast flex items-start justify-between" :class="`fe-toast-${toast.type}`"><span class="text-sm font-medium leading-5">{{ toast.message }}</span><button @click="remove(toast.id)" class="ml-4 min-h-6 min-w-6 rounded text-lg leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-current" aria-label="Dismiss notification">×</button></div></div></template>
+<template><div class="fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-sm space-y-2 sm:bottom-6 sm:right-6" aria-live="polite"><div v-for="toast in toasts" :key="toast.id" class="fe-toast flex items-start justify-between" :class="`fe-toast-${toast.type}`"><span class="text-sm font-medium leading-5">{{ toast.message }}</span><button @click="remove(toast.id)" class="ml-4 min-h-6 min-w-6 rounded text-lg leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-current" aria-label="Dismiss notification">×</button></div></div></template>

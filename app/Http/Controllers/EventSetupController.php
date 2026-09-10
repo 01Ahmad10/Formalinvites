@@ -20,6 +20,7 @@ use Inertia\Response;
 
 class EventSetupController extends Controller
 {
+    private const CUSTOMER_EVENT_TYPES = ['wedding', 'engagement'];
     public function show(Request $request, Event $event, InvitationPresenter $presenter, InvitationPublicationSnapshotBuilder $snapshots): Response
     {
         $this->view($request, $event);
@@ -65,7 +66,7 @@ class EventSetupController extends Controller
             'details' => $this->details($request),
             'location' => $this->location($request),
             'rsvp' => $this->rsvp($request, $event),
-            'information' => $this->information($request),
+            'information' => $this->information($request, $event),
             'design' => null,
             default => abort(404),
         };
@@ -126,10 +127,15 @@ class EventSetupController extends Controller
         return $data;
     }
 
-    private function information(Request $request): array
+    private function information(Request $request, Event $event): array
     {
         $request->validate(['main_date' => ['required', 'date'], 'start_time' => ['required', 'date_format:H:i']]);
-        $details = $this->details($request);
+        $details = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'host_name' => ['required', 'string', 'max:255'],
+            'second_host_name' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+        ]);
         $location = $this->location($request);
         $rsvp = $request->validate(['rsvp_deadline' => ['nullable', 'date']]);
 
@@ -137,12 +143,22 @@ class EventSetupController extends Controller
             throw ValidationException::withMessages(['rsvp_deadline' => 'RSVP deadline must be on or before the Event date.']);
         }
 
+        $template = $event->template;
+        if ($template?->supported_event_types && ! in_array($event->event_type, $template->supported_event_types, true)) {
+            throw ValidationException::withMessages(['event_type' => "{$template->name} is not available for the selected invitation type. Choose a supported type or return to Choose Design."]);
+        }
+
         return [...$details, ...$location, ...$rsvp];
     }
 
     private function design(Request $request, Event $event): void
     {
-        $data = $request->validate(['template_id' => ['required', 'integer', 'exists:templates,id'], 'settings' => ['nullable', 'array']]);
+        $data = $request->validate(['event_type' => ['nullable', Rule::in(Event::TYPES)], 'template_id' => ['required', 'integer', 'exists:templates,id'], 'settings' => ['nullable', 'array']]);
+        $eventType = $data['event_type'] ?? $event->event_type;
+        if (! $eventType) throw ValidationException::withMessages(['event_type' => 'Choose Wedding or Engagement before selecting a design.']);
+        if (! $request->user()->isAdmin() && array_key_exists('event_type', $data) && ! in_array($eventType, self::CUSTOMER_EVENT_TYPES, true)) {
+            throw ValidationException::withMessages(['event_type' => 'Only Wedding and Engagement invitations are available at launch.']);
+        }
         $template = Template::findOrFail($data['template_id']);
 
         if (! $request->user()->isAdmin() && ! $template->is_customer_selectable && $template->id !== $event->template_id) {
@@ -152,12 +168,12 @@ class EventSetupController extends Controller
         if (! $template->is_active && $template->id !== $event->template_id) {
             throw ValidationException::withMessages(['template_id' => 'Inactive templates cannot be selected for an Event.']);
         }
-        if ($template->supported_event_types && ! in_array($event->event_type, $template->supported_event_types, true)) {
+        if ($template->supported_event_types && ! in_array($eventType, $template->supported_event_types, true)) {
             throw ValidationException::withMessages(['template_id' => 'This template does not support the selected Event type.']);
         }
 
         $settings = InvitationTemplateSettings::validateEventSettings($data['settings'] ?? [], $template->default_settings);
-        $event->update(['template_id' => $template->id]);
+        $event->update(['event_type' => $eventType, 'template_id' => $template->id]);
         $event->templateSetting()->updateOrCreate([], ['settings' => $settings]);
     }
 
@@ -166,9 +182,10 @@ class EventSetupController extends Controller
         return Template::query()
             ->where(fn ($query) => $query->where('is_active', true)->orWhere('id', $event->template_id))
             ->when(! $user->isAdmin(), fn ($query) => $query->where(fn ($query) => $query->where('is_customer_selectable', true)->orWhere('id', $event->template_id)))
+            ->when(! $user->isAdmin(), fn ($query) => $query->where(fn ($templates) => $templates->whereIn('component_key', Template::COMPONENT_KEYS)->orWhere('id', $event->template_id)))
             ->orderBy('display_order')->orderBy('name')->get()
-            ->filter(fn (Template $template) => $template->id === $event->template_id || ! $template->supported_event_types || in_array($event->event_type, $template->supported_event_types, true))
-            ->map(fn (Template $template) => ['id' => $template->id, 'name' => $template->name, 'description' => $template->description, 'component_key' => $template->component_key, 'demo_url' => $template->demo_url, 'is_active' => $template->is_active, ...InvitationTemplateSettings::selectionOptions($template->default_settings)])
+            ->filter(fn (Template $template) => $template->id === $event->template_id || ! $event->event_type || ! $template->supported_event_types || in_array($event->event_type, $template->supported_event_types, true))
+            ->map(fn (Template $template) => ['id' => $template->id, 'name' => $template->name, 'description' => $template->description, 'component_key' => $template->component_key, 'demo_url' => $template->demo_url, 'supported_event_types' => $template->supported_event_types, 'is_active' => $template->is_active, ...InvitationTemplateSettings::selectionOptions($template->default_settings)])
             ->values()->all();
     }
 

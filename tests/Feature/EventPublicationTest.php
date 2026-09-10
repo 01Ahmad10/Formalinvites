@@ -217,12 +217,12 @@ class EventPublicationTest extends TestCase
             ->assertRedirect();
     }
 
-    public function test_customer_with_one_unpublished_event_is_sent_to_setup_but_multiple_events_are_not_ambiguous(): void
+    public function test_customer_login_lands_on_dashboard_for_one_or_multiple_invitations(): void
     {
         [$event, $owner] = $this->eventWithUsers();
         $owner->update(['password' => Hash::make('secret-password')]);
 
-        $this->post(route('login'), ['email' => $owner->email, 'password' => 'secret-password'])->assertRedirect(route('events.setup', $event));
+        $this->post(route('login'), ['email' => $owner->email, 'password' => 'secret-password'])->assertRedirect(route('dashboard'));
 
         auth()->logout();
         $second = $this->eventForCustomer($owner->customer);

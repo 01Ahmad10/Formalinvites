@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Customer;
 use App\Models\Event;
 use App\Models\InvitationParty;
+use App\Models\InvitationEntitlement;
 use App\Models\Payment;
 use App\Models\PaymentTransaction;
 use App\Models\RsvpPersonResponse;
@@ -93,7 +94,9 @@ class AdminDashboardAnalytics
             ->get(['id', 'title'])
             ->map(fn (Event $event) => ['kind' => 'event', 'id' => $event->id, 'title' => $event->title ?: 'Invitation', 'message' => 'Public invitation is disabled.']);
         $allowanceItems = Customer::query()
-            ->whereRaw('allowed_events <= (select count(*) from events where events.customer_id = customers.id)')
+            ->whereDoesntHave('invitationEntitlements', fn ($query) => $query
+                ->where('status', InvitationEntitlement::AVAILABLE)
+                ->whereNull('claimed_event_id'))
             ->orderBy('customers.name')->limit(5)->get()
             ->map(fn (Customer $customer) => ['kind' => 'customer', 'id' => $customer->id, 'title' => $customer->name, 'message' => 'Invitation allowance has been reached.']);
 

@@ -55,6 +55,7 @@ class EventBuilderController extends Controller
                 'guests' => route('events.guests.index', $event),
             ],
             'isLive' => $event->isLive(),
+            'canComplete' => ! $event->isLive() && ! $event->isDisabled() && ! $event->isArchived(),
         ]);
     }
 

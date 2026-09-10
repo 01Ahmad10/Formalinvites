@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\Event;
+use App\Models\EventPackage;
+use App\Models\InvitationEntitlement;
 use App\Models\EventPublication;
 use App\Models\InvitationParty;
 use App\Models\Payment;
@@ -40,7 +42,9 @@ class AdminOperationsPresentationTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $customer = Customer::create(['name' => 'Operations Customer', 'allowed_events' => 2]);
-        $event = Event::create(['customer_id' => $customer->id, 'title' => 'Operational event', 'event_type' => 'birthday', 'host_name' => 'Host', 'guest_capacity' => 10, 'status' => 'published']);
+        $package = EventPackage::create(['name' => 'Operations Package', 'minimum_guests' => 1, 'maximum_guests' => 20, 'price' => 20, 'is_active' => true]);
+        $event = Event::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'title' => 'Operational event', 'event_type' => 'birthday', 'host_name' => 'Host', 'guest_capacity' => 10, 'status' => 'published']);
+        InvitationEntitlement::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'exact_guest_capacity' => 10, 'status' => InvitationEntitlement::CLAIMED, 'claimed_event_id' => $event->id, 'claimed_at' => now()]);
         $party = InvitationParty::create(['event_id' => $event->id, 'name' => 'Family', 'maximum_party_size' => 3]);
         $party->rsvp->update(['status' => 'not_attending', 'submitted_at' => now()]);
         $payment = Payment::create(['customer_id' => $customer->id, 'event_id' => $event->id, 'original_amount' => 100, 'final_amount' => 90, 'paid_amount' => 0, 'status' => 'unpaid']);

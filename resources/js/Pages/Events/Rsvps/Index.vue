@@ -41,7 +41,7 @@ const updateMeal = () => {
         <template #header>
             <div class="flex justify-between">
                 <h2 class="text-xl font-semibold">RSVP responses</h2>
-                <Link :href="fromSetup ? route('events.setup', { event: event.id, step: 3 }) : route('events.show', event.id)" class="rounded border px-3 py-2 text-sm">{{ fromSetup ? 'Back to Invitation Setup' : 'Back to Event' }}</Link>
+                <Link :href="fromSetup ? route('events.setup', { event: event.id, step: 3 }) : route('events.show', event.id)" class="rounded border px-3 py-2 text-sm">{{ fromSetup ? 'Back to Invitation Setup' : 'Back to Invitation' }}</Link>
             </div>
         </template>
 

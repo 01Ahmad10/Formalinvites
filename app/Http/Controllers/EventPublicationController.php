@@ -29,6 +29,14 @@ class EventPublicationController extends Controller
             }
         });
 
+        if (! $request->user()->isAdmin()) {
+            return to_route('dashboard')->with('invitation_completed', [
+                'event_id' => $event->id,
+                'guests_url' => route('events.guests.index', $event),
+                'view_url' => route('events.invitation.live-preview', $event),
+            ]);
+        }
+
         return back()->with('success', 'Invitation published successfully.');
     }
 

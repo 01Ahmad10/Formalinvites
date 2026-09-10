@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Event;
 use App\Models\EventPackage;
 use App\Models\InvitationParty;
+use App\Models\InvitationEntitlement;
 use App\Models\Template;
 use App\Models\User;
 use App\Support\InvitationTemplateSettings;
@@ -17,13 +18,15 @@ class CustomerAllowanceAndLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_customer_allowance_counts_archived_events_and_blocks_customer_and_admin_creation(): void
+    public function test_customer_allowance_counts_claimed_entitlements_including_archived_events(): void
     {
         [$customer, $owner, $admin, $package] = $this->customerWithUsers(2);
         $first = $this->event($customer, $package, 'First');
         $second = $this->event($customer, $package, 'Second', 'archived');
         $first->members()->attach($owner, ['role' => 'owner']);
         $second->members()->attach($owner, ['role' => 'owner']);
+        InvitationEntitlement::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'exact_guest_capacity' => 10, 'status' => InvitationEntitlement::CLAIMED, 'claimed_event_id' => $first->id, 'claimed_at' => now()]);
+        InvitationEntitlement::create(['customer_id' => $customer->id, 'event_package_id' => $package->id, 'exact_guest_capacity' => 10, 'status' => InvitationEntitlement::CLAIMED, 'claimed_event_id' => $second->id, 'claimed_at' => now()]);
 
         $this->actingAs($owner)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
             ->where('allowance.allowed_events', 2)
@@ -32,36 +35,30 @@ class CustomerAllowanceAndLifecycleTest extends TestCase
             ->where('allowance.can_create_event', false)
         );
 
-        $this->actingAs($owner)->post(route('events.store'), $this->eventPayload())->assertSessionHasErrors('customer_id');
-        $this->actingAs($admin)->post(route('events.store'), [...$this->eventPayload(), 'customer_id' => $customer->id, 'event_package_id' => $package->id, 'guest_capacity' => 10])->assertSessionHasErrors('customer_id');
-
-        $this->actingAs($admin)->put(route('admin.customers.update', $customer), ['allowed_events' => 1])->assertSessionHasErrors('allowed_events');
-        $this->actingAs($admin)->put(route('admin.customers.update', $customer), ['allowed_events' => 3])->assertSessionHasNoErrors();
-
-        $this->actingAs($owner)->post(route('events.store'), $this->eventPayload(['title' => 'Third']))->assertRedirect();
-        $this->assertSame(3, $customer->fresh()->usedEvents());
-        $this->assertSame(0, $customer->fresh()->remainingEvents());
+        $this->actingAs($owner)->post(route('events.store'), ['start_setup' => true])->assertSessionHasErrors('entitlement_id');
+        $this->actingAs($admin)->post(route('events.store'), ['customer_id' => $customer->id])->assertSessionHasErrors('entitlement_id');
     }
 
-    public function test_admin_provisioning_requires_an_allowance_that_accommodates_its_initial_event(): void
+    public function test_admin_provisioning_requires_at_least_one_entitlement(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $package = EventPackage::create(['name' => 'Small', 'minimum_guests' => 1, 'maximum_guests' => 20, 'price' => 20, 'is_active' => true]);
 
         $this->actingAs($admin)->post(route('admin.clients.store'), [
-            'name' => 'New Customer', 'phone' => null, 'guest_capacity' => 10, 'allowed_events' => 0,
+            'name' => 'New Customer', 'phone' => null, 'entitlements' => [],
             'primary_name' => 'Primary User', 'primary_email' => 'primary@example.test', 'primary_password' => 'password123',
-        ])->assertSessionHasErrors('allowed_events');
+        ])->assertSessionHasErrors('entitlements');
 
         $this->actingAs($admin)->post(route('admin.clients.store'), [
-            'name' => 'New Customer', 'phone' => null, 'guest_capacity' => 10, 'allowed_events' => 2,
+            'name' => 'New Customer', 'phone' => null, 'entitlements' => [['event_package_id' => $package->id, 'exact_guest_capacity' => 10], ['event_package_id' => $package->id, 'exact_guest_capacity' => 10]],
             'primary_name' => 'Primary User', 'primary_email' => 'primary@example.test', 'primary_password' => 'password123',
         ])->assertRedirect(route('admin.customers.index'));
 
         $customer = Customer::where('name', 'New Customer')->firstOrFail();
         $this->assertSame(2, $customer->allowed_events);
-        $this->assertSame(1, $customer->usedEvents());
-        $this->assertSame($package->id, $customer->events()->firstOrFail()->event_package_id);
+        $this->assertSame(0, $customer->usedEvents());
+        $this->assertSame(2, $customer->remainingEvents());
+        $this->assertSame($package->id, $customer->invitationEntitlements()->firstOrFail()->event_package_id);
     }
 
     public function test_complete_disable_enable_archive_and_public_routes_follow_the_operational_lifecycle(): void

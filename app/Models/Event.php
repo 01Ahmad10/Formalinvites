@@ -20,6 +20,7 @@ class Event extends Model
     protected $fillable = ['customer_id', 'event_package_id', 'guest_capacity', 'template_id', 'title', 'event_type', 'host_name', 'second_host_name', 'description', 'main_date', 'end_date', 'start_time', 'end_time', 'venue', 'address', 'location_url', 'rsvp_deadline', 'event_timezone', 'dress_code', 'parking_information', 'transportation_information', 'accommodation_information', 'guest_information', 'status', 'submitted_snapshot_hash', 'submitted_at', 'approved_snapshot_hash', 'approved_at', 'approved_by', 'review_note'];
     protected function casts(): array { return ['guest_capacity' => 'integer', 'main_date' => 'date', 'end_date' => 'date', 'rsvp_deadline' => 'date', 'submitted_at' => 'immutable_datetime', 'approved_at' => 'immutable_datetime']; }
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
+    public function invitationEntitlement(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(InvitationEntitlement::class, 'claimed_event_id'); }
     public function package(): BelongsTo { return $this->belongsTo(EventPackage::class, 'event_package_id'); }
     public function template(): BelongsTo { return $this->belongsTo(Template::class); }
     public function templateSetting(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(EventTemplateSetting::class); }

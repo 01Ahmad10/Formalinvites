@@ -6,9 +6,11 @@ use App\Models\Customer;
 use App\Models\Coupon;
 use App\Models\Event;
 use App\Models\EventPackage;
+use App\Models\InvitationEntitlement;
 use App\Models\Payment;
 use App\Models\RsvpPersonResponse;
 use App\Models\User;
+use App\Support\InvitationEntitlementClaimService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -25,7 +27,12 @@ class AdminController extends Controller
         $search = $request->string('search')->trim()->toString();
         $customers = Customer::query()
             ->with(['users' => fn ($query) => $query->where('role', 'customer')->orderBy('customer_account_role')->orderBy('id'), 'events' => fn ($query) => $query->with(['package', 'payments'])->withCount('publications')])
-            ->withCount(['users' => fn ($query) => $query->where('role', 'customer'), 'events'])
+            ->withCount([
+                'users' => fn ($query) => $query->where('role', 'customer'),
+                'events',
+                'invitationEntitlements as claimed_entitlements_count' => fn ($query) => $query->where('status', InvitationEntitlement::CLAIMED),
+                'invitationEntitlements as available_entitlements_count' => fn ($query) => $query->where('status', InvitationEntitlement::AVAILABLE),
+            ])
             ->when($search, fn ($query) => $query->where(fn ($query) => $query->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%")))
             ->latest()->paginate(25)->withQueryString();
         $customers->getCollection()->transform(fn (Customer $customer) => $this->customerForList($customer));
@@ -44,8 +51,11 @@ class AdminController extends Controller
         $data = $r->validate(['name'=>'sometimes|required|string|max:255','contact_name'=>'sometimes|nullable|string|max:255','email'=>'sometimes|nullable|email','phone'=>'sometimes|nullable|string|max:50','is_active'=>'sometimes|boolean','allowed_events'=>'sometimes|integer|min:0']);
         DB::transaction(function () use ($customer, $data): void {
             $customer = Customer::query()->lockForUpdate()->findOrFail($customer->id);
-            if (array_key_exists('allowed_events', $data) && $data['allowed_events'] < $customer->usedEvents()) {
-                throw ValidationException::withMessages(['allowed_events' => "Allowed invitations cannot be lower than this Client's {$customer->usedEvents()} existing Events."]);
+            if (array_key_exists('allowed_events', $data)) {
+                $entitlementCount = $customer->invitationEntitlements()->lockForUpdate()->count();
+                if ($data['allowed_events'] !== $entitlementCount) {
+                    throw ValidationException::withMessages(['allowed_events' => 'Invitation entitlements are now authoritative. Adjust entitlement slots with their Package and exact guest capacity instead of changing this legacy field.']);
+                }
             }
             $customer->update($data);
         });
@@ -54,24 +64,28 @@ class AdminController extends Controller
     public function storeClient(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name' => ['required','string','max:255'], 'phone' => ['nullable','string','max:50'], 'guest_capacity' => ['required','integer','min:1'], 'allowed_events' => ['required','integer','min:1'],
+            'name' => ['required','string','max:255'], 'phone' => ['nullable','string','max:50'],
+            'entitlements' => ['required', 'array', 'min:1'],
+            'entitlements.*.event_package_id' => ['required', 'integer', 'exists:event_packages,id'],
+            'entitlements.*.exact_guest_capacity' => ['required', 'integer', 'min:1'],
             'primary_name' => ['required','string','max:255'], 'primary_email' => ['required','email','unique:users,email'], 'primary_password' => ['required','string','min:8'],
             'secondary_name' => ['nullable','string','max:255'], 'secondary_email' => ['nullable','email','unique:users,email'], 'secondary_password' => ['nullable','string','min:8'],
         ]);
-        $package = $this->packageForCapacity((int) $data['guest_capacity']);
+        $entitlements = $this->validatedEntitlements($data['entitlements']);
         $secondary = filled($data['secondary_name'] ?? null) || filled($data['secondary_email'] ?? null) || filled($data['secondary_password'] ?? null);
         if ($secondary && (! filled($data['secondary_name'] ?? null) || ! filled($data['secondary_email'] ?? null) || ! filled($data['secondary_password'] ?? null))) throw ValidationException::withMessages(['secondary_name' => 'Complete all second login fields or leave them all blank.']);
 
-        DB::transaction(function () use ($data, $secondary, $package): void {
-            // These legacy Customer fields remain populated without making Admin enter the same contact details twice.
-            $customer = Customer::create(['name'=>$data['name'],'contact_name'=>$data['primary_name'],'email'=>$data['primary_email'],'phone'=>$data['phone'] ?? null,'is_active'=>true,'allowed_events'=>$data['allowed_events']]);
-            $event = $customer->events()->create(['event_package_id'=>$package->id, 'guest_capacity'=>$data['guest_capacity'], 'event_timezone'=>config('app.timezone'), 'status'=>'draft']);
+        DB::transaction(function () use ($data, $secondary, $entitlements): void {
+            // allowed_events remains synchronized only for transition compatibility.
+            $customer = Customer::create(['name'=>$data['name'],'contact_name'=>$data['primary_name'],'email'=>$data['primary_email'],'phone'=>$data['phone'] ?? null,'is_active'=>true,'allowed_events'=>count($entitlements)]);
             $primary = User::create(['customer_id'=>$customer->id,'name'=>$data['primary_name'],'email'=>$data['primary_email'],'password'=>Hash::make($data['primary_password']),'role'=>'customer','customer_account_role'=>'primary']);
-            $event->members()->attach($primary->id, ['role'=>'owner']);
-            if ($secondary) { $second = User::create(['customer_id'=>$customer->id,'name'=>$data['secondary_name'],'email'=>$data['secondary_email'],'password'=>Hash::make($data['secondary_password']),'role'=>'customer','customer_account_role'=>'secondary']); $event->members()->attach($second->id, ['role'=>'editor']); }
+            if ($secondary) { User::create(['customer_id'=>$customer->id,'name'=>$data['secondary_name'],'email'=>$data['secondary_email'],'password'=>Hash::make($data['secondary_password']),'role'=>'customer','customer_account_role'=>'secondary']); }
+            foreach ($entitlements as $entitlement) {
+                $customer->invitationEntitlements()->create($entitlement);
+            }
             return;
         });
-        return to_route('admin.customers.index')->with('success', 'Client, login account, package, and Event setup shell created.');
+        return to_route('admin.customers.index')->with('success', 'Client, login account, and invitation entitlements created.');
     }
 
     public function showCustomer(Customer $customer): Response
@@ -79,6 +93,7 @@ class AdminController extends Controller
         $customer->load([
             'users' => fn ($query) => $query->where('role','customer')->orderBy('customer_account_role'),
             'events.package',
+            'events.template:id,name',
             'events.payments',
             'events' => fn ($query) => $query
                 ->withCount([
@@ -96,7 +111,7 @@ class AdminController extends Controller
             ->whereIn('invitation_parties.event_id', $customer->events->pluck('id'))
             ->where('invitation_parties.is_active', true)->whereNotNull('rsvps.submitted_at')->where('rsvp_person_responses.is_attending', true)
             ->groupBy('invitation_parties.event_id')->pluck('confirmed_attendees', 'invitation_parties.event_id');
-        return Inertia::render('Admin/ClientDetails', ['customer' => $customer, 'allowance' => $customer->allowanceSummary(), 'customerUsers' => $customer->users, 'events' => $customer->events->map(fn (Event $event) => ['id'=>$event->id,'title'=>$event->title,'event_type'=>$event->event_type,'date'=>$event->main_date?->format('M j, Y'),'invitation_status'=>$event->invitationStatus(),'guest_capacity'=>$event->effectiveGuestCapacity(),'allocated_capacity'=>(int) ($event->allocated_capacity ?? 0),'families_count'=>(int) $event->families_count,'responded_families_count'=>(int) $event->responded_families_count,'confirmed_attendees'=>(int) ($attendees[$event->id] ?? 0),'package'=>$event->package?->only(['name','minimum_guests','maximum_guests','price']),'finance'=>['has_record'=>$event->payments->isNotEmpty(),'final_amount'=>(float) $event->payments->sum('final_amount'),'paid_amount'=>(float) $event->payments->sum('paid_amount'),'remaining_amount'=>$event->payments->sum(fn ($payment) => $payment->remainingAmount())]])->values(), 'canAddSecondLogin' => $customer->users->count() < 2]);
+        return Inertia::render('Admin/ClientDetails', ['customer' => $customer, 'allowance' => $customer->allowanceSummary(), 'customerUsers' => $customer->users, 'events' => $customer->events->map(fn (Event $event) => ['id'=>$event->id,'title'=>$event->title,'event_type'=>$event->event_type,'date'=>$event->main_date?->format('M j, Y'),'invitation_status'=>$event->invitationStatus(),'guest_capacity'=>$event->effectiveGuestCapacity(),'allocated_capacity'=>(int) ($event->allocated_capacity ?? 0),'families_count'=>(int) $event->families_count,'responded_families_count'=>(int) $event->responded_families_count,'confirmed_attendees'=>(int) ($attendees[$event->id] ?? 0),'template_name'=>$event->template?->name,'package'=>$event->package?->only(['name','minimum_guests','maximum_guests','price']),'finance'=>['has_record'=>$event->payments->isNotEmpty(),'final_amount'=>(float) $event->payments->sum('final_amount'),'paid_amount'=>(float) $event->payments->sum('paid_amount'),'remaining_amount'=>$event->payments->sum(fn ($payment) => $payment->remainingAmount())]])->values(), 'entitlements' => $customer->invitationEntitlements()->with('package:id,name,minimum_guests,maximum_guests,price')->orderBy('id')->get()->map(fn (InvitationEntitlement $entitlement) => ['id' => $entitlement->id, 'event_package_id' => $entitlement->event_package_id, 'exact_guest_capacity' => $entitlement->exact_guest_capacity, 'status' => $entitlement->status, 'claimed_event_id' => $entitlement->claimed_event_id, 'package' => $entitlement->package?->only(['name', 'minimum_guests', 'maximum_guests', 'price'])]), 'packages' => EventPackage::query()->where('is_active', true)->capacityOrder()->get(['id', 'name', 'minimum_guests', 'maximum_guests', 'price']), 'canAddSecondLogin' => $customer->users->count() < 2]);
     }
 
     public function storeSecondLogin(Request $request, Customer $customer): RedirectResponse
@@ -111,6 +126,48 @@ class AdminController extends Controller
         return back()->with('success','Second client login added.');
     }
 
+    public function startInvitation(Request $request, Customer $customer, InvitationEntitlementClaimService $claims): RedirectResponse
+    {
+        $data = $request->validate(['entitlement_id' => ['nullable', 'integer']]);
+        $event = $claims->claim($customer, $data['entitlement_id'] ?? null);
+
+        return to_route('events.setup', ['event' => $event, 'step' => 1])->with('success', 'Invitation started from the selected entitlement.');
+    }
+
+    public function updateInvitationEntitlement(Request $request, Customer $customer, InvitationEntitlement $entitlement): RedirectResponse
+    {
+        abort_unless($entitlement->customer_id === $customer->id, 404);
+        abort_unless($entitlement->isAvailable(), 422, 'Claimed invitation entitlements cannot be changed here.');
+        $data = $request->validate(['event_package_id' => ['required', 'exists:event_packages,id'], 'exact_guest_capacity' => ['required', 'integer', 'min:1']]);
+        $package = EventPackage::query()->where('is_active', true)->findOrFail($data['event_package_id']);
+
+        if ($data['exact_guest_capacity'] < $package->minimum_guests || $data['exact_guest_capacity'] > $package->maximum_guests) {
+            throw ValidationException::withMessages(['exact_guest_capacity' => 'Exact guest capacity must fall within the selected Package range.']);
+        }
+
+        $entitlement->update($data);
+
+        return back()->with('success', 'Available invitation entitlement updated.');
+    }
+
+    public function storeInvitationEntitlement(Request $request, Customer $customer): RedirectResponse
+    {
+        $data = $request->validate([
+            'event_package_id' => ['required', 'integer', 'exists:event_packages,id'],
+            'exact_guest_capacity' => ['required', 'integer', 'min:1'],
+        ]);
+        $entitlement = $this->validatedEntitlements([$data])[0];
+
+        DB::transaction(function () use ($customer, $entitlement): void {
+            $locked = Customer::query()->lockForUpdate()->findOrFail($customer->id);
+            $locked->invitationEntitlements()->create($entitlement);
+            // Compatibility only; summaries still derive from entitlements.
+            $locked->update(['allowed_events' => $locked->invitationEntitlements()->count()]);
+        });
+
+        return back()->with('success', 'Invitation entitlement added.');
+    }
+
     public function resetCustomerUserPassword(Request $request, User $user): RedirectResponse
     {
         abort_unless($user->role === 'customer', 404);
@@ -122,16 +179,26 @@ class AdminController extends Controller
     private function ensureCustomerAccountSpace(int $customerId, bool $lock = false): void
     {
         $accounts = User::query()->where('customer_id',$customerId)->where('role','customer');
-        if ($lock) $accounts->lockForUpdate();
-        if ($accounts->count() >= 2) throw ValidationException::withMessages(['customer_id'=>'A Client can have at most two login accounts.']);
+        $accountCount = $lock
+            ? $accounts->lockForUpdate()->get(['id'])->count()
+            : $accounts->count();
+        if ($accountCount >= 2) throw ValidationException::withMessages(['customer_id'=>'This client already has the maximum number of login accounts.']);
     }
 
-    private function packageForCapacity(int $capacity): EventPackage
+    private function validatedEntitlements(array $entitlements): array
     {
-        $matches = EventPackage::query()->where('is_active', true)->where('minimum_guests', '<=', $capacity)->where('maximum_guests', '>=', $capacity)->get();
-        if ($matches->isEmpty()) throw ValidationException::withMessages(['guest_capacity' => 'No active Package covers this guest capacity. Review the Package ranges.']);
-        if ($matches->count() > 1) throw ValidationException::withMessages(['guest_capacity' => 'More than one active Package covers this guest capacity. Resolve the overlapping Package ranges first.']);
-        return $matches->first();
+        $packages = EventPackage::query()->where('is_active', true)->whereIn('id', collect($entitlements)->pluck('event_package_id'))->get()->keyBy('id');
+
+        return collect($entitlements)->map(function (array $entitlement, int $index) use ($packages): array {
+            $package = $packages->get($entitlement['event_package_id']);
+            if (! $package) throw ValidationException::withMessages(["entitlements.$index.event_package_id" => 'Choose an active Package.']);
+            $capacity = (int) $entitlement['exact_guest_capacity'];
+            if ($capacity < $package->minimum_guests || $capacity > $package->maximum_guests) {
+                throw ValidationException::withMessages(["entitlements.$index.exact_guest_capacity" => 'Exact guest capacity must fall within the selected Package range.']);
+            }
+
+            return ['event_package_id' => $package->id, 'exact_guest_capacity' => $capacity, 'status' => InvitationEntitlement::AVAILABLE];
+        })->all();
     }
 
     private function customerForList(Customer $customer): array
@@ -139,17 +206,12 @@ class AdminController extends Controller
         $users = $customer->users;
         $primary = $users->firstWhere('customer_account_role', 'primary') ?? $users->first();
         $secondary = $users->firstWhere('customer_account_role', 'secondary') ?? $users->reject(fn (User $user) => $primary && $user->is($primary))->first();
-        $events = $customer->events;
-        $event = $events->count() === 1 ? $events->first() : null;
-        $payment = $event?->payments->first();
-
         return [
             'id' => $customer->id, 'name' => $customer->name,
             'primary_login' => $primary ? ['name' => $primary->name, 'email' => $primary->email] : null,
             'second_login' => $secondary ? ['name' => $secondary->name, 'email' => $secondary->email] : null,
-            'event_count' => $events->count(),
+            'event_count' => $customer->events->count(),
             'allowance' => $customer->allowanceSummary(),
-            'event' => $event ? ['title' => $event->title, 'guest_capacity' => $event->effectiveGuestCapacity(), 'invitation_status' => $event->invitationStatus(), 'payment_status' => match ($payment?->status) { 'paid' => 'Paid', 'partially_paid' => 'Partially Paid', default => 'Unpaid' }] : null,
         ];
     }
     public function packages(Request $request): Response { $search = $request->string('search')->trim()->toString(); $active = $request->string('active')->toString(); $packages = EventPackage::query()->when($search, fn ($query) => $query->where('name', 'like', "%{$search}%"))->when(in_array($active, ['active', 'inactive'], true), fn ($query) => $query->where('is_active', $active === 'active'))->capacityOrder()->get(); return Inertia::render('Admin/Packages', ['packages'=>$packages, 'filters' => ['search' => $search, 'active' => $active]]); }

@@ -22,9 +22,7 @@ class AdminZeroStateTest extends TestCase
             ->where('events', [])
             ->where('hasEvents', false)
             ->where('isFiltered', false));
-        $this->actingAs($admin)->get(route('events.create'))->assertInertia(fn (Assert $page) => $page
-            ->component('Events/Form')
-            ->where('requiresClient', true));
+        $this->actingAs($admin)->get(route('events.create'))->assertRedirect(route('admin.customers.index'));
         $this->actingAs($admin)->get(route('admin.customers.index'))->assertInertia(fn (Assert $page) => $page
             ->component('Admin/Customers')
             ->where('customers', [])

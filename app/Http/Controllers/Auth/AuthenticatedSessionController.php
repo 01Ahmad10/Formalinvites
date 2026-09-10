@@ -33,14 +33,12 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        if (! $request->session()->has('url.intended') && $request->user()->role === 'customer') {
-            $events = $request->user()->managedEvents()->withCount('publications')->get(['events.id']);
-            if ($events->count() === 1 && $events->first()->publications_count === 0) {
-                return to_route('events.setup', $events->first());
-            }
-        }
+        $user = $request->user();
+        $firstInvitationStart = $user->isAdmin() || ! $user->customer_id
+            ? null
+            : $user->customer()->whereDoesntHave('events')->whereHas('invitationEntitlements', fn ($query) => $query->where('status', 'available')->whereNull('claimed_event_id'))->exists();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->intended(route($firstInvitationStart ? 'events.start' : 'dashboard', absolute: false));
     }
 
     /**

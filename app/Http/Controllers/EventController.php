@@ -15,14 +15,51 @@ use DateTimeZone;
 use App\Support\InvitationPublicationSnapshotBuilder;
 use App\Support\EventPublicationService;
 use App\Support\EventTiming;
+use App\Support\InvitationEntitlementClaimService;
 use Illuminate\Support\Facades\DB;
 
 class EventController extends Controller
 {
     private const ADMIN_ONLY_STATUSES = ['published', 'disabled', 'archived'];
+    public function start(Request $request): Response|RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless(! $user->isAdmin() && $user->customer_id, 403);
+
+        $entitlements = Customer::findOrFail($user->customer_id)->invitationEntitlements()
+            ->where('status', \App\Models\InvitationEntitlement::AVAILABLE)
+            ->whereNull('claimed_event_id')
+            ->orderBy('id')
+            ->get(['id', 'exact_guest_capacity'])
+            ->map(fn ($entitlement) => ['id' => $entitlement->id, 'exact_guest_capacity' => $entitlement->exact_guest_capacity])
+            ->values();
+
+        if ($entitlements->isEmpty()) return to_route('dashboard')->with('error', 'No invitation entitlements are available.');
+
+        return Inertia::render('Events/Start', ['entitlements' => $entitlements]);
+    }
     public function index(Request $request, InvitationPublicationSnapshotBuilder $snapshots): Response { $user = $request->user(); abort_unless($user->can('viewAny', Event::class), 403); $search = $request->string('search')->trim()->toString(); $type = $request->string('event_type')->toString(); $status = $user->isAdmin() ? $request->string('status')->toString() : ''; $customerId = $user->isAdmin() ? $request->integer('customer_id') : null; $eventScope = $user->isAdmin() ? Event::query() : $user->managedEvents(); $hasEvents = $eventScope->exists(); $events = $eventScope->with(['customer','package','publications'])->when($search, fn ($query) => $query->where(fn ($query) => $query->where('title', 'like', "%{$search}%")->orWhere('host_name', 'like', "%{$search}%")->orWhere('second_host_name', 'like', "%{$search}%")->orWhere('venue', 'like', "%{$search}%")->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$search}%"))))->when($type, fn ($query) => $query->where('event_type', $type))->when($status, fn ($query) => $query->where('status', $status))->when($customerId, fn ($query) => $query->where('customer_id', $customerId))->latest('events.created_at')->paginate(25)->withQueryString(); $events->each(function (Event $event) use ($snapshots): void { $live = $event->publications->sortByDesc('version')->first(); $dirty = $live && ! hash_equals($live->snapshot_hash, $snapshots->hash($event)); $event->setAttribute('live_version', $live?->version); $event->setAttribute('invitation_status', $event->invitationStatus()); $event->setAttribute('unpublished_changes', (bool) $dirty); $event->unsetRelation('publications'); }); return Inertia::render('Events/Index', ['events' => $events->items(), 'pagination' => ['current_page' => $events->currentPage(), 'last_page' => $events->lastPage(), 'total' => $events->total(), 'prev_page_url' => $events->previousPageUrl(), 'next_page_url' => $events->nextPageUrl()], 'filters' => ['search' => $search, 'event_type' => $type, 'status' => $status, 'customer_id' => $customerId ?: ''], 'types' => Event::TYPES, 'statuses' => Event::STATUSES, 'customers' => $user->isAdmin() ? Customer::where('is_active', true)->get(['id', 'name']) : [], 'isAdmin' => $user->isAdmin(), 'hasEvents' => $hasEvents, 'isFiltered' => filled($search) || filled($type) || filled($status) || $customerId > 0]); }
-    public function create(): Response { $user = request()->user(); abort_unless($user->can('create', Event::class), 403); $customers = $user->isAdmin() ? Customer::where('is_active', true)->get() : collect(); return Inertia::render('Events/Form', ['event' => null, 'customers' => $customers, 'packages' => $user->isAdmin() ? EventPackage::where('is_active', true)->capacityOrder()->get() : [], 'types' => Event::TYPES, 'statuses' => $this->statusesFor($user->isAdmin()), 'timezones' => DateTimeZone::listIdentifiers(), 'defaultTimezone' => config('app.timezone'), 'isAdmin' => $user->isAdmin(), 'requiresClient' => $user->isAdmin() && $customers->isEmpty()]); }
-    public function store(Request $request): RedirectResponse { abort_unless($request->user()->can('create', Event::class), 403); $data = $this->validated($request); if ($request->user()->isAdmin()) { $request->validate(['customer_id' => ['required', 'exists:customers,id']]); $data['customer_id'] = $request->integer('customer_id'); } else { $data['customer_id'] = $request->user()->customer_id; unset($data['event_package_id'], $data['guest_capacity']); } $event = DB::transaction(function () use ($request, $data): Event { $customer = Customer::query()->lockForUpdate()->findOrFail($data['customer_id']); if (! $customer->canCreateEvent()) throw ValidationException::withMessages(['customer_id' => 'This Customer has reached their allowed invitation limit. Increase the allowance before creating another Event.']); if ($request->user()->isAdmin()) $this->assertCapacityCompatible(isset($data['event_package_id']) ? EventPackage::find($data['event_package_id']) : null, $data['guest_capacity'] ?? null, 0); $data['status'] = 'draft'; $event = Event::create($data); $event->members()->syncWithoutDetaching([$request->user()->id => ['role' => 'owner']]); return $event; }); return to_route('events.show', $event)->with('success', 'Event created.'); }
+    public function create(): RedirectResponse { abort_unless(request()->user()->isAdmin(), 403); return to_route('admin.customers.index')->with('error', 'Start invitations from the relevant Client entitlement.'); }
+    public function store(Request $request, InvitationEntitlementClaimService $claims): RedirectResponse
+    {
+        abort_unless($request->user()->can('create', Event::class), 403);
+        $data = $request->validate([
+            'start_setup' => ['nullable', 'boolean'],
+            'customer_id' => [$request->user()->isAdmin() ? 'required' : 'nullable', 'exists:customers,id'],
+            'entitlement_id' => ['nullable', 'integer'],
+        ]);
+
+        if (! $request->user()->isAdmin() && ! $request->boolean('start_setup')) {
+            throw ValidationException::withMessages(['start_setup' => 'Customers can start an invitation only through their available entitlement.']);
+        }
+
+        $customer = $request->user()->isAdmin()
+            ? Customer::findOrFail($data['customer_id'])
+            : Customer::findOrFail($request->user()->customer_id);
+        $event = $claims->claim($customer, $data['entitlement_id'] ?? null);
+
+        return to_route('events.setup', ['event' => $event, 'step' => 1]);
+    }
     public function show(Event $event, InvitationPublicationSnapshotBuilder $snapshots): Response
     {
         $user = request()->user();
@@ -94,7 +131,7 @@ class EventController extends Controller
         ]);
     }
     public function edit(Event $event): Response { $user = request()->user(); abort_unless($user->can('update', $event), 403); return Inertia::render('Events/Form', ['event' => $event->load('package'), 'customers' => $user->isAdmin() ? Customer::where('is_active', true)->get() : [], 'packages' => $user->isAdmin() ? EventPackage::where('is_active', true)->capacityOrder()->get() : [], 'types' => Event::TYPES, 'statuses' => $this->statusesFor($user->isAdmin()), 'timezones' => DateTimeZone::listIdentifiers(), 'defaultTimezone' => config('app.timezone'), 'isAdmin' => $user->isAdmin()]); }
-    public function update(Request $request, Event $event, EventPublicationService $publications): RedirectResponse { abort_unless($request->user()->can('update', $event), 403); $data = $this->validated($request); if (($data['status'] ?? $event->status) !== $event->status) throw ValidationException::withMessages(['status' => 'Use the Event publishing workflow to change status.']); unset($data['status']); if (!$request->user()->isAdmin()) { unset($data['customer_id'], $data['event_package_id'], $data['guest_capacity']); } else { $package = array_key_exists('event_package_id', $data) ? EventPackage::find($data['event_package_id']) : $event->package; $capacity = array_key_exists('guest_capacity', $data) ? $data['guest_capacity'] : $event->guest_capacity; $this->assertCapacityCompatible($package, $capacity, $event->allocatedGuestCapacity()); } DB::transaction(function () use ($event, $data, $request, $publications): void { $locked = Event::query()->lockForUpdate()->findOrFail($event->id); abort_if($locked->isArchived(), 422, 'Archived Events cannot be changed.'); $locked->update($data); $publications->publishIfActiveLocked($locked, $request->user()); }); return to_route('events.show', $event)->with('success', 'Event updated.'); }
+    public function update(Request $request, Event $event, EventPublicationService $publications): RedirectResponse { abort_unless($request->user()->can('update', $event), 403); $data = $this->validated($request); if (($data['status'] ?? $event->status) !== $event->status) throw ValidationException::withMessages(['status' => 'Use the Event publishing workflow to change status.']); unset($data['status']); $entitlement = $event->invitationEntitlement; if ($entitlement && ((array_key_exists('event_package_id', $data) && (int) $data['event_package_id'] !== (int) $event->event_package_id) || (array_key_exists('guest_capacity', $data) && (int) $data['guest_capacity'] !== (int) $event->guest_capacity))) throw ValidationException::withMessages(['guest_capacity' => 'A claimed invitation keeps the Package and exact capacity from its entitlement.']); if (!$request->user()->isAdmin()) { unset($data['customer_id'], $data['event_package_id'], $data['guest_capacity']); } else { $package = array_key_exists('event_package_id', $data) ? EventPackage::find($data['event_package_id']) : $event->package; $capacity = array_key_exists('guest_capacity', $data) ? $data['guest_capacity'] : $event->guest_capacity; $this->assertCapacityCompatible($package, $capacity, $event->allocatedGuestCapacity()); } DB::transaction(function () use ($event, $data, $request, $publications): void { $locked = Event::query()->lockForUpdate()->findOrFail($event->id); abort_if($locked->isArchived(), 422, 'Archived Events cannot be changed.'); $locked->update($data); $publications->publishIfActiveLocked($locked, $request->user()); }); return to_route('events.show', $event)->with('success', 'Event updated.'); }
     private function validated(Request $request): array
     {
         $existingEvent = $request->route('event');

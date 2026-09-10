@@ -104,6 +104,7 @@ class DashboardController extends Controller
         return Inertia::render('CustomerDashboard', [
             'invitations' => $invitations,
             'allowance' => $customer?->allowanceSummary() ?? ['allowed_events' => 0, 'used_events' => 0, 'remaining_events' => 0, 'can_create_event' => false],
+            'completion' => request()->session()->get('invitation_completed'),
         ]);
     }
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import { Link } from '@inertiajs/vue3';
+
+import formalInvitesLogo from '@/assets/brand/formalinvites-logo.webp';
 </script>
 
 <template>
@@ -9,8 +10,8 @@ import { Link } from '@inertiajs/vue3';
     >
         <div>
             <Link href="/">
-                <ApplicationLogo class="h-20 w-20 fill-current text-gray-500" />
-            </Link>
+            <img :src="formalInvitesLogo" alt="FormalEvites" class="h-16 w-auto object-contain" />
+        </Link>
         </div>
 
         <div
